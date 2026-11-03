@@ -25,13 +25,13 @@ WALL_MARGIN = 50       # écart minimal avec les murs de l'arène
 
 # --- navigation -----------------------------------------------------------------
 class NavGrid:
-    """Grille de 32 px ; les cellules proches d'un obstacle sont bloquées. `update_target`
+    """Grille de 16 px ; les cellules proches d'un obstacle sont bloquées. `update_target`
     calcule les distances (BFS) jusqu'à la cellule de la cible ; `next_point` donne la prochaine
     cellule à viser pour s'en approcher."""
 
     NEIGHBORS = ((1, 0), (-1, 0), (0, 1), (0, -1), (1, 1), (1, -1), (-1, 1), (-1, -1))
 
-    def __init__(self, arena: pygame.Rect, obstacles, cell: int = 32, margin: int = 22):
+    def __init__(self, arena: pygame.Rect, obstacles, cell: int = 16, margin: int = 20):
         self.arena, self.cell, self.obstacles = arena, cell, list(obstacles)
         self.margin = margin
         self.cols, self.rows = math.ceil(arena.w / cell), math.ceil(arena.h / cell)
