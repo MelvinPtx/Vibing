@@ -159,8 +159,9 @@ def particle(surface, style, name, pos, size, angle, alpha, rng=None) -> None:
 # --- une animation -------------------------------------------------------------------
 class _Anim:
     def __init__(self, kind, element, attack=None, pos=None, direction=None, radius=30.0, hostile=False,
-                 strong=False):
+                 strong=False, motif=None):
         self.kind, self.hostile, self.strong = kind, hostile, strong
+        self.motif = motif                      # animation propre à la capacité (src/ui/move_fx.py) ou None
         self.element = element
         self.style = STYLES[element]
         self.attack, self.t = attack, 0.0
@@ -174,8 +175,12 @@ class _Anim:
         self.dur = DUR.get(kind, 0.4)
         if kind in ("burst", "zone") and radius > 100:
             self.dur = 0.75
+        if motif is not None:
+            self.dur = motif.impact_dur if kind == "impact" else motif.dur
         n = {"melee": 7, "burst": int(min(26, 8 + radius / 8)), "zone": int(min(26, 8 + radius / 8)),
              "impact": 10 if strong else 6}.get(kind, 0)
+        if motif is not None:
+            n = 24
         self.parts = [(self.rng.uniform(0, math.tau), self.rng.uniform(0.55, 1.0), self.rng.uniform(0.7, 1.3),
                        self.rng.uniform(-4, 4)) for _ in range(n)]
         if attack is not None and kind in ("melee", "burst"):
@@ -200,13 +205,15 @@ class AttackFX:
 
     # --- création ---
     def spawn(self, attack, hostile: bool = False) -> None:
+        from .move_fx import MOTIFS                        # (import tardif : move_fx dépend de ce module)
         element = PType.FEU if attack.name == "Explosion" else attack.element     # l'explosion est de feu
+        motif = MOTIFS.get(attack.move_id)                  # animation propre à la vraie capacité, si elle en a une
         if attack.kind == "projectile":
-            a = _Anim("projectile", element, attack, attack.pos, attack.velocity, attack.radius, hostile)
+            a = _Anim("projectile", element, attack, attack.pos, attack.velocity, attack.radius, hostile, motif=motif)
         elif attack.kind == "melee":
-            a = _Anim("melee", element, attack, attack.pos, attack.offset, attack.radius, hostile)
+            a = _Anim("melee", element, attack, attack.pos, attack.offset, attack.radius, hostile, motif=motif)
         else:                                      # "burst" (autour du lanceur) ou "zone" (posée au sol)
-            a = _Anim(attack.kind, element, attack, attack.pos, None, attack.radius, hostile)
+            a = _Anim(attack.kind, element, attack, attack.pos, None, attack.radius, hostile, motif=motif)
         self.anims.append(a)
 
     def hit(self, pos, element, strong: bool = False) -> None:
@@ -225,7 +232,8 @@ class AttackFX:
                     a.t += dt
                 else:                                              # fin du projectile -> petit impact
                     a.done = True
-                    self.anims.append(_Anim("impact", a.element, None, a.fixed, None, 24 + a.radius))
+                    imp = a.motif if a.motif is not None and a.motif.impact is not None else None
+                    self.anims.append(_Anim("impact", a.element, None, a.fixed, None, 24 + a.radius, motif=imp))
             else:
                 a.t += dt
                 a.done = a.t >= a.dur
@@ -234,7 +242,14 @@ class AttackFX:
     # --- rendu ---
     def draw(self, surface) -> None:
         for a in self.anims:
-            getattr(self, "_draw_" + a.kind)(surface, a)
+            m = a.motif
+            fn = (m.impact if a.kind == "impact" else m.draw) if m is not None else None
+            if fn is not None:
+                fn(self, surface, a)
+                if a.kind != "impact":
+                    self._warn(surface, a, a.pos(), a.radius)
+            else:
+                getattr(self, "_draw_" + a.kind)(surface, a)
 
     def _warn(self, surface, a, pos, r) -> None:
         if a.hostile:                                              # liseré rouge : attention, ça fait mal

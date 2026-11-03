@@ -150,6 +150,81 @@ def test_hits_make_impact_flashes_in_game():
     g.draw()
 
 
+def test_every_real_move_has_its_own_motif():
+    from src.combat.moves import MOVE_PLAN
+    from src.ui.move_fx import MOTIFS
+    assert set(MOTIFS) == set(MOVE_PLAN)
+    assert len({id(m.draw) for m in MOTIFS.values()}) >= 28            # beaucoup de dessins distincts, pas un seul recopié
+    assert all(m.draw is not None and m.dur > 0 for m in MOTIFS.values())
+
+
+def test_every_motif_draws_in_flight_and_on_impact_without_errors():
+    from src.combat.moves import MOVE_PLAN, spec_for
+    pygame.init()
+    screen = pygame.display.set_mode((460, 320))
+    bg = (38, 42, 58)
+
+    def drawn():
+        return sum(screen.get_at((x, y))[:3] != bg for x in range(0, 460, 4) for y in range(0, 320, 4))
+    for move_id in MOVE_PLAN:
+        spec = spec_for(move_id)
+        o = Owner((200, 160))
+        fx = AttackFX()
+        atk = spec.build(o, Vector2(1, 0))
+        fx.spawn(atk)
+        anim = fx.anims[0]
+        assert anim.motif is not None and (spec.kind == "projectile" or anim.dur == anim.motif.dur), move_id
+        seen = []
+        for step in range(30):
+            if spec.kind == "projectile":
+                atk.update(DT)
+            else:
+                atk.time_left = 1
+            fx.update(DT)
+            if step in (4, 14, 28):
+                screen.fill(bg)
+                fx.draw(screen)
+                seen.append(drawn())
+        assert max(seen) > 8, (move_id, seen)
+        if spec.kind == "projectile":                                  # fin de trajectoire : impact propre à la capacité
+            atk.kill()
+            fx.update(DT)
+            imp = [a for a in fx.anims if a.kind == "impact"]
+            assert len(imp) == 1 and (imp[0].motif is anim.motif or anim.motif.impact is None)
+            assert imp[0].dur == (anim.motif.impact_dur if anim.motif.impact else imp[0].dur)
+            screen.fill(bg)
+            fx.update(0.08)
+            fx.draw(screen)
+            assert drawn() > 8, move_id
+
+
+def test_enemy_and_boss_attacks_keep_the_generic_animations():
+    fx, o = AttackFX(), Owner((0, 0))
+    fx.spawn(M.ENEMY_BALLE_OMBRE.build(o, Vector2(1, 0)), hostile=True)
+    fx.spawn(M.SEISME.build_at(o, Vector2(50, 50)), hostile=True)
+    assert all(a.motif is None for a in fx.anims)
+
+
+def test_many_simultaneous_animations_stay_cheap():
+    import time
+    from src.combat.moves import MOVE_PLAN, spec_for
+    pygame.init()
+    screen = pygame.display.set_mode((1024, 720))
+    fx = AttackFX()
+    for i, move_id in enumerate(MOVE_PLAN):
+        o = Owner((100 + (i % 7) * 130, 120 + (i // 7) * 110))
+        atk = spec_for(move_id).build(o, Vector2(1, 0))
+        fx.spawn(atk)
+        atk.time_left = 5
+    for _ in range(10):
+        fx.update(DT)
+    t0 = time.perf_counter()
+    for _ in range(10):
+        fx.draw(screen)
+    ms = (time.perf_counter() - t0) / 10 * 1000
+    assert ms < 400, f"{ms:.0f} ms pour les 42 animations à la fois"       # très large : le but est de détecter une dérive
+
+
 if __name__ == "__main__":
     pygame.init()
     pygame.display.set_mode((10, 10))

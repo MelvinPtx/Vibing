@@ -16,6 +16,7 @@ python -m tests.test_content   # tests headless starters, ennemis, mort, icônes
 python -m tests.test_bosses    # tests headless obstacles, navigation, boss
 python -m tests.test_fx        # tests headless animations d'attaque
 python -m tests.test_progression  # tests headless niveaux, évolutions, capacités réelles
+python -m tests.test_moves     # tests headless effets réels des capacités
 ```
 Au lancement, on choisit son starter (Sprigatito, Fuecoco ou Quaxly). Contrôles : ZQSD / WASD / flèches = bouger · Espace / Maj / clic droit = Dash · clic gauche / E / R = attaques · Échap = menu pause (Reprendre / Statut / Quitter).
 
@@ -34,7 +35,8 @@ Au lancement, on choisit son starter (Sprigatito, Fuecoco ou Quaxly). Contrôles
 - `src/data/pokedex.py` : données Pokémon **générées** (`python -m tools.import_pokemon_data`).
 - `src/ui/evolution.py` : écran d'évolution.
 - `src/species.py` : espèces utilisées (n° de Pokédex) : Évoli (joueur), Rattata, mannequins.
-- `src/ui/attack_fx.py` : animations d'attaque dessinées par le code (un style par type).
+- `src/ui/attack_fx.py` : moteur d'animations d'attaque dessinées par le code (style par type, flash d'impact).
+- `src/ui/move_fx.py` : une animation propre à chacune des 42 capacités apprises, d'après leur description officielle.
 - `src/ui/sprites.py` : sprites animés PMD (8 directions, Idle/Walk/Attack/Swing/Shoot/Hurt).
 - `src/ui/` : interface au style Pokémon Écarlate/Violet : `theme.py` (palette, bandeaux, curseur, jauges, pastilles de type), `hud.py`, `reward_menu.py`, `pause_menu.py` (menu + statut), `room_view.py`.
 
@@ -78,28 +80,13 @@ Chacun a 3 phases (à 60 % et 30 % de PV) et ses attaques sont **annoncées au s
 Vaincre un boss rend la moitié des PV.
 
 ## Animations d'attaque
-Effets **originaux, dessinés par le code** (aucun asset tiers) dans `src/ui/attack_fx.py` : une coupe en croissant pour
-la mêlée, une onde de choc avec éclats pour les zones, une orbe à traînée pour les projectiles (qui finit en impact),
-et un flash sur la cible touchée (plus gros si super efficace). Chaque type a sa palette et sa forme d'éclat : flammes,
-gouttes, feuilles, éclairs, éclats de glace, bulles, rochers, volutes spectrales, étoiles de fée... Les attaques ennemies
-ont un liseré rouge pour qu'on les repère. Les animations vivent plus longtemps que les hitbox (très brèves).
-
-## Niveaux, évolutions et capacités réelles
-On démarre au niveau 10. Chaque ennemi vaincu rapporte `expérience de base de l'espèce x son niveau / 7` (comme dans les jeux) ;
-les courbes d'expérience sont les vraies (taux de croissance). Les starters **évoluent au niveau 16 puis au niveau 36**
-(Sprigatito → Floragato → Meowscarada, Fuecoco → Crocalor → Skeledirge, Quaxly → Quaxwell → Quaquaval) avec l'écran
-d'évolution des jeux : nouveaux types, sprite, stats (rapport des vraies stats de base) et capacités. Chaque niveau
-donne +2,5 % de stats et +3,5 % de PV ; les ennemis gagnent +10 % de PV par salle.
-
-Les capacités sont de **vraies capacités apprises par chaque forme** dans Écarlate/Violet, débloquées à leur niveau d'apprentissage
-réel (par exemple Canon Graine au niveau 20 pour Floragato), sans aucune capacité partagée entre deux lignées. Type, catégorie,
-puissance, PP et priorité viennent de la base ; le jeu choisit seulement la forme (mêlée, coup large, zone, projectile). Les capacités
-« qui ne ratent jamais » sont à tête chercheuse (Feuille Magik, Magie Florale), Tranch'Aqua et Lame d'Air traversent les ennemis,
-Chant Flamboyant et Danse Aquatique donnent un bonus cumulable (Atq. Spé. / vitesse), Magie Florale est toujours critique.
-
-### Sources de données
-- [pokemondb/database](https://github.com/pokemondb/database) : types, stats de base, taux de croissance, expérience de base et chiffres de chaque capacité.
-  Elle ne contient ni capacités apprises, ni évolutions, ni noms français ; son `pokemon-forms.yaml` est mal formé (ligne 31354), l'outil
-  d'import ne lit donc que les blocs utiles.
-- [PokeAPI/pokeapi](https://github.com/PokeAPI/pokeapi) (CSV) : capacités apprises par niveau dans Écarlate/Violet, noms français, niveaux d'évolution.
-Régénérer : `python -m tools.import_pokemon_data` (réseau + PyYAML) ; le jeu, lui, n'a besoin ni de l'un ni de l'autre.
+Effets **originaux, dessinés par le code** (aucun asset tiers). `src/ui/attack_fx.py` fournit le moteur (coupe, onde, projectile à
+traînée, flash d'impact, style de couleur par type) ; `src/ui/move_fx.py` donne à **chacune des 42 capacités apprises** son propre motif,
+conçu d'après sa description officielle française : Griffe = trois griffures, Morsure = deux rangées de canines qui se referment,
+Léchouille = grand coup de langue, Vive-Attaque / Aqua-Jet = traînée de vitesse (voile d'eau pour Aqua-Jet), Cru-Ailes = deux ailes
+déployées, Câlinerie = nuage de bagarre et cœurs, Close Combat = rafale de coups, Aquatacle = enveloppé d'eau puis vague, Danse
+Aquatique = ondulations et bulles, Chant Canon = notes de musique, Mégaphone = anneaux d'écho, Aboiement = arcs sonores sombres,
+Calcination = flammes qui calcinent la zone, Feuille Magik = feuilles multicolores qui poursuivent, Canon Graine = déluge de graines,
+Tempête Verte = tourbillon de feuilles, Magie Florale = bouquet piégé qui éclate en pétales, Lance-Flammes = torrent de flammes,
+Déflagration = étoile de feu, Chant Flamboyant = notes enflammées, Tranch'Aqua / Lame d'Air = lames en croissant, etc.
+Les capacités des ennemis et des boss gardent les animations génériques (liseré rouge pour les repérer).
