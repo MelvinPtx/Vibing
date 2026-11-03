@@ -4,10 +4,14 @@ import pygame
 from pygame import Vector2
 
 from .. import settings as S
+from ..combat.moves import MOVE_PLAN, slot_of, spec_for
+from ..data.pokedex import MOVES as DB
 from . import theme as T
+from .reward_menu import wrap
 
-ITEMS = [("Reprendre", "resume"), ("Statut", "status"), ("Quitter", "quit")]
-MENU = pygame.Rect(S.SCREEN_W - 340, 112, 300, 268)
+ITEMS = [("Reprendre", "resume"), ("Statut", "status"), ("Capacités", "moves"), ("Quitter", "quit")]
+MENU = pygame.Rect(S.SCREEN_W - 340, 112, 300, 328)
+SLOT_INFO = {"basic": ("Clic G", "Coup rapide"), "special": ("E", "Lourd / onde"), "cast": ("R", "Projectile")}
 ROW_H = 54
 MOVE_SLOTS = (("basic", "Clic G"), ("special", "E"), ("cast", "R"))
 
@@ -30,6 +34,9 @@ def _icon(surface, kind: str, c, color) -> None:
     elif kind == "status":
         pygame.draw.circle(surface, color, c, 13, 3)
         T.text(surface, "i", 18, color, center=c)
+    elif kind == "moves":
+        for dy in (-8, 0, 8):
+            pygame.draw.line(surface, color, (c[0] - 11, c[1] + dy), (c[0] + 11, c[1] + dy), 4)
     else:
         pygame.draw.line(surface, color, (c[0] - 9, c[1] - 9), (c[0] + 9, c[1] + 9), 4)
         pygame.draw.line(surface, color, (c[0] - 9, c[1] + 9), (c[0] + 9, c[1] - 9), 4)
@@ -40,19 +47,23 @@ class PauseMenu:
 
     def __init__(self):
         self.index = 0
+        self.slot_i = 0                    # emplacement sélectionné dans l'écran « Capacités »
         self.screen = "main"
         self.rects = [pygame.Rect(MENU.x + 14, MENU.y + 62 + i * (ROW_H + 6), MENU.w - 28, ROW_H)
                       for i in range(len(ITEMS))]
 
-    def handle_event(self, e):
+    def handle_event(self, e, player=None):
         n = len(ITEMS)
         if e.type == pygame.KEYDOWN:
             if e.key == pygame.K_ESCAPE:
-                if self.screen == "status":
+                if self.screen != "main":              # Statut, Capacités : retour au menu principal
                     self.screen = "main"
                     return None
                 return "resume"
             if self.screen == "status":
+                return None
+            if self.screen == "moves":
+                self._moves_key(e, player)
                 return None
             if e.key in (pygame.K_UP, pygame.K_z, pygame.K_w):
                 self.index = (self.index - 1) % n
@@ -72,18 +83,74 @@ class PauseMenu:
 
     def _activate(self, i):
         action = ITEMS[i][1]
-        if action == "status":
-            self.screen = "status"
+        if action in ("status", "moves"):
+            self.screen = action
             return None
         return action
+
+    def _moves_key(self, e, player) -> None:
+        """↑↓ : emplacement ; ←→ (ou Entrée) : capacité suivante / précédente parmi celles apprises."""
+        slots = [s for s in ("basic", "special", "cast") if s in player.moveset]
+        if e.key in (pygame.K_UP, pygame.K_z, pygame.K_w):
+            self.slot_i = (self.slot_i - 1) % len(slots)
+        elif e.key in (pygame.K_DOWN, pygame.K_s):
+            self.slot_i = (self.slot_i + 1) % len(slots)
+        elif e.key in (pygame.K_LEFT, pygame.K_q, pygame.K_a, pygame.K_RIGHT, pygame.K_d, pygame.K_RETURN, pygame.K_KP_ENTER):
+            slot = slots[self.slot_i]
+            mine = player.known_for(slot)
+            cur = mine.index(next(m for m in mine if spec_for(m) is player.moveset[slot]))
+            step = -1 if e.key in (pygame.K_LEFT, pygame.K_q, pygame.K_a) else 1
+            player.equip(slot, mine[(cur + step) % len(mine)])
 
     # --- rendu ---------------------------------------------------------------
     def draw(self, surface, player, room_number: int = 0, sprites=None) -> None:
         surface.blit(T.blurred_backdrop(surface), (0, 0))
-        if self.screen == "status":
+        if self.screen == "moves":
+            self._draw_moves(surface, player)
+        elif self.screen == "status":
             self._draw_status(surface, player, room_number, sprites)
         else:
             self._draw_main(surface, player, room_number, sprites)
+
+    def _draw_moves(self, surface, player) -> None:
+        T.header(surface, "CAPACITÉS", T.ORANGE, T.ORANGE_PAT, "★")
+        T.alpha_rect(surface, (0, 62, S.SCREEN_W, 40), T.NAVY_DARK, 210, 0)
+        pygame.draw.rect(surface, T.YELLOW, (22, 70, 5, 24), border_radius=2)
+        T.text(surface, f"{player.name} · niveau {player.level} · {len(player.known)} capacités apprises", 18, T.WHITE,
+               midleft=(40, 82))
+        slots = [s for s in ("basic", "special", "cast") if s in player.moveset]
+        for i, slot in enumerate(slots):
+            spec, selected = player.moveset[slot], i == self.slot_i
+            r = pygame.Rect(40, 118 + i * 164, S.SCREEN_W - 80, 152)
+            T.alpha_rect(surface, r, T.NAVY, 200, 14)
+            if selected:
+                pygame.draw.rect(surface, T.YELLOW, r, 4, border_radius=14)
+                T.cursor(surface, r.x - 34, r.centery, 30)
+            key, role = SLOT_INFO[slot]
+            T.pill(surface, key, 15, T.YELLOW if selected else T.NAVY_ROW, T.YELLOW_TXT if selected else T.WHITE,
+                   pad=(14, 5), topleft=(r.x + 18, r.y + 14))
+            T.text(surface, role, 13, T.GREY, False, topleft=(r.x + 18, r.y + 46))
+            T.draw_type_icon(surface, spec.element, (r.x + 52, r.y + 98), 58)
+            T.text(surface, spec.name, 28, T.WHITE, shadow=True, topleft=(r.x + 108, r.y + 14))
+            T.type_pill(surface, spec.element, 24, topleft=(r.x + 108 + T.font(28).size(spec.name)[0] + 16, r.y + 18))
+            shape = "Zone autour de soi" if spec.kind == "burst" else "Projectile" if spec.kind == "projectile" else \
+                ("Mêlée large" if spec.reach >= 50 else "Mêlée")
+            T.text(surface, f"{spec.category.value} · puissance {spec.power:.0f} · recharge {spec.cooldown:.2f} s · {shape}",
+                   14, T.LABEL, topleft=(r.x + 108, r.y + 54))
+            desc = DB[spec.move_id]["desc"] if spec.move_id in DB else ""
+            for j, line in enumerate(wrap(T.font(16, False), desc, r.w - 108 - 150)[:3]):
+                T.text(surface, line, 16, T.WHITE, False, topleft=(r.x + 108, r.y + 80 + j * 22))
+            mine = player.known_for(slot)
+            pos = next(k for k, m in enumerate(mine) if spec_for(m) is spec) + 1
+            T.text(surface, f"{pos}/{len(mine)}", 22, T.WHITE if selected else T.GREY, center=(r.right - 70, r.centery - 10))
+            if len(mine) > 1:
+                for dx, pts in ((-52, [(0, 0), (14, -12), (14, 12)]), (52, [(14, 0), (0, -12), (0, 12)])):
+                    c = (r.right - 70 + dx - 7, r.centery - 10)
+                    pygame.draw.polygon(surface, T.YELLOW if selected else T.GREY, [(c[0] + x, c[1] + y) for x, y in pts])
+            if player.manual.get(slot):
+                T.pill(surface, "choisie", 12, T.VIOLET, T.WHITE, pad=(10, 3), center=(r.right - 70, r.centery + 22))
+        T.footer(surface, [("↑↓", "Emplacement"), ("← →", "Changer de capacité"), ("Échap", "Retour")],
+                 T.ORANGE, T.ORANGE_PAT)
 
     def _draw_main(self, surface, player, room_number, sprites=None) -> None:
         # Équipe (ligne jaune sélectionnée, comme le Pokémon de tête)

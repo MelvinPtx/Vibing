@@ -33,4 +33,5 @@ def compute_damage(attack: Attack, target) -> DamageResult:
         ratio = owner.stat("spa") / target.stat("spdef")
     mult = effectiveness(attack.element, target.types)
     stab = STAB if attack.element in getattr(owner, "types", ()) else 1.0
-    return DamageResult(attack.power * ratio * mult * stab, mult)
+    bonus = attack.status_bonus if getattr(target, "burn_left", 0) > 0 else 1.0     # Châtiment vs cible brûlée
+    return DamageResult(attack.power * ratio * mult * stab * bonus, mult)

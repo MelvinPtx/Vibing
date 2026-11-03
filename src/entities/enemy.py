@@ -44,6 +44,8 @@ class Enemy(Entity):
         self.out_attacks: list = []                    # attaques hostiles créées, récupérées par la salle
         self.obstacles: list = []                      # rochers de la salle (fournis par le RoomManager)
         self.nav = None                                # NavGrid de la salle (contournement)
+        self.stun_left = 0.0                           # apeuré / paralysé : ne bouge plus
+        self.slow_left = 0.0                           # ralenti
 
     # --- état / rendu de sprites ---
     @property
@@ -73,6 +75,12 @@ class Enemy(Entity):
     def sprite_tint(self):
         return None
 
+    def stun(self, seconds: float) -> None:
+        self.stun_left = max(self.stun_left, seconds)
+
+    def slow(self, seconds: float) -> None:
+        self.slow_left = max(self.slow_left, seconds)
+
     def act(self, anim: str, duration: float) -> None:
         """Joue une animation d'action (relancée à chaque appel)."""
         self.act_anim, self.act_left = anim, duration
@@ -97,7 +105,7 @@ class Enemy(Entity):
     # --- steering ---
     @property
     def speed_cap(self) -> float:
-        return self.speed
+        return self.speed * (0.5 if self.slow_left > 0 else 1.0)
 
     def chase_point(self, player) -> Vector2:
         """Où viser pour rejoindre le joueur : lui-même si le chemin est dégagé, sinon le prochain
@@ -131,6 +139,8 @@ class Enemy(Entity):
         self.flash = max(0.0, self.flash - dt)
         self.contact_cd = max(0.0, self.contact_cd - dt)
         self.act_left = max(0.0, self.act_left - dt)
+        self.stun_left = max(0.0, self.stun_left - dt)
+        self.slow_left = max(0.0, self.slow_left - dt)
         if not self.alive:
             self.tick_death(dt)
             return
@@ -139,6 +149,10 @@ class Enemy(Entity):
             self.spawn_left -= dt
             return
         if player is None:
+            return
+        if self.stun_left > 0:                      # apeuré : il s'immobilise
+            self.vel *= max(0.0, 1 - 10 * dt)
+            self.pos += self.vel * dt
             return
         force = self.think(dt, player, others)
         if not self.alive:          # mort pendant think() (ex. explosion)
@@ -230,7 +244,7 @@ class Racaillou(Enemy):
 
     @property
     def speed_cap(self) -> float:
-        return self.CHARGE_SPEED if self.state == "charge" else self.speed
+        return self.CHARGE_SPEED if self.state == "charge" else self.speed * (0.5 if self.slow_left > 0 else 1.0)
 
     @property
     def sprite_tint(self):

@@ -33,8 +33,17 @@ class MoveSpec:
     homing: float = 0.0        # rad/s : le projectile se courbe vers l'ennemi le plus proche (ne rate jamais)
     crit: float = 1.0          # multiplicateur de dégâts (coup critique garanti : Magie Florale)
     burn: float = 0.0          # chance de brûler la cible
-    buff: tuple | None = None  # (stat, bonus) : améliore le lanceur à chaque utilisation (Chant Flamboyant)
+    buffs: tuple = ()          # ((stat, bonus), ...) : modifie le lanceur à chaque utilisation (+ : Chant Flamboyant, - : Surchauffe)
     move_id: str = ""          # identifiant pokemondb de la vraie capacité (vide pour les capacités génériques)
+    hits: int = 1              # coups d'affilée (Coup Double)
+    lunge: float = 0.0         # px : le lanceur fonce en avant en attaquant (Vive-Attaque, Aqua-Jet, Aquatacle)
+    retreat: float = 0.0       # px : le lanceur recule après avoir touché (Demi-Tour)
+    recoil: float = 0.0        # fraction des dégâts infligés subie en retour (Aquatacle)
+    status_bonus: float = 1.0  # dégâts multipliés si la cible est brûlée (Châtiment)
+    solo: float = 1.0          # dégâts multipliés si le lanceur ne tient aucun objet (Acrobatie)
+    stun: tuple | None = None  # (chance, secondes) : apeure / paralyse (Morsure, Lame d'Air, Léchouille)
+    slow: tuple | None = None  # (chance, secondes) : ralentit la cible (Balayette)
+    crit_rate: float = 0.0     # chance de coup critique x1,5 (Tranche, Tranche-Nuit, Tranch'Aqua)
 
     def build_at(self, owner, pos) -> Attack:
         """Zone posée à un endroit fixe (Séisme, éboulement...), qui ne suit pas le lanceur."""
@@ -43,20 +52,61 @@ class MoveSpec:
                       kind="zone")
 
     def build(self, owner, direction: Vector2) -> Attack:
-        common = dict(owner=owner, element=self.element, category=self.category,
-                      power=self.power * self.crit, radius=self.radius, duration=self.duration,
-                      name=self.name, kind=self.kind)
+        power, crit_hit = self.power * self.crit, False
+        if self.crit_rate and random.random() < self.crit_rate:           # coup critique (taux de critiques élevé)
+            power, crit_hit = power * 1.5, True
+        if self.solo != 1.0 and not getattr(owner, "modifiers", [None]):  # Acrobatie : sans objet
+            power *= self.solo
+        duration = self.duration * (self.hits if self.kind == "melee" else 1)
+        common = dict(owner=owner, element=self.element, category=self.category, power=power,
+                      radius=self.radius, duration=duration, name=self.name, kind=self.kind)
         if self.kind == "melee":
             atk = Attack(pos=owner.pos, offset=direction * self.reach, **common)
+            if self.hits > 1:
+                atk.rehit = self.duration                                  # touche de nouveau à chaque coup
         elif self.kind == "burst":
             atk = Attack(pos=owner.pos, offset=Vector2(), **common)
         else:
             atk = Attack(pos=owner.pos + direction * 24, velocity=direction * self.speed,
                          pierce=self.pierce, **common)
             atk.homing = self.homing
+        atk.move_id, atk.crit_hit, atk.status_bonus = self.move_id, crit_hit, self.status_bonus
+        d = Vector2(direction)
         if self.burn:
             atk.on_hit.append(_burn_hook(self.burn))
+        if self.stun:
+            atk.on_hit.append(_status_hook("stun", *self.stun))
+        if self.slow:
+            atk.on_hit.append(_status_hook("slow", *self.slow))
+        if self.retreat:
+            atk.on_hit.append(_retreat_hook(d, self.retreat))
+        if self.recoil:
+            atk.on_hit.append(_recoil_hook(self.recoil))
         return atk
+
+
+def _status_hook(kind: str, chance: float, seconds: float):
+    """Apeure/paralyse ('stun') ou ralentit ('slow') la cible, avec une chance. Sans effet sur les boss."""
+    def hook(attack, target, result) -> None:
+        fn = getattr(target, kind, None)
+        if fn and result.multiplier > 0 and random.random() < chance:
+            fn(seconds)
+    return hook
+
+
+def _retreat_hook(direction: Vector2, distance: float):
+    def hook(attack, target, result) -> None:                # Demi-Tour : le lanceur revient en arrière
+        if not getattr(attack, "_retreated", False):
+            attack._retreated = True
+            attack.owner.pos = attack.owner.pos - direction * distance
+    return hook
+
+
+def _recoil_hook(fraction: float):
+    def hook(attack, target, result) -> None:                # contrecoup : jamais mortel
+        o = attack.owner
+        o.hp = max(1.0, o.hp - result.amount * fraction)
+    return hook
 
 
 def _burn_hook(chance: float):
@@ -104,6 +154,48 @@ def from_db(move_id: str, shape: str, **extra) -> MoveSpec:
     spec["cooldown"] = round(min(max(spec["cooldown"], 0.2), 2.0), 3)
     spec["radius"] = round(spec["radius"], 1)
     return MoveSpec(**base, **spec, move_id=move_id, **extra)
+
+
+# Pour chaque vraie capacité : (emplacement, forme, effets). Emplacements : "basic" (clic gauche, coup rapide),
+# "special" (E : coup lourd ou onde), "cast" (R : projectile). Les effets reprennent la description officielle.
+BURN = dict(burn=0.10)
+MOVE_PLAN = {
+    "scratch": ("basic", "melee", {}), "tackle": ("basic", "melee", {}), "pound": ("basic", "melee", {}),
+    "quick-attack": ("basic", "melee", dict(lunge=55.0)), "aqua-jet": ("basic", "melee", dict(lunge=55.0)),
+    "lick": ("basic", "melee", dict(stun=(0.3, 1.0))), "low-sweep": ("basic", "melee", dict(slow=(1.0, 2.5))),
+    "double-hit": ("basic", "melee", dict(hits=2)),
+    "bite": ("special", "wide", dict(stun=(0.3, 0.9))), "u-turn": ("special", "wide", dict(retreat=90.0)),
+    "slash": ("special", "wide", dict(crit_rate=0.25)), "night-slash": ("special", "wide", dict(crit_rate=0.25)),
+    "knock-off": ("special", "wide", {}), "play-rough": ("special", "wide", {}), "wing-attack": ("special", "wide", {}),
+    "acrobatics": ("special", "wide", dict(solo=2.0)), "liquidation": ("special", "wide", {}),
+    "wave-crash": ("special", "wide", dict(lunge=70.0, recoil=0.33)),
+    "aqua-step": ("special", "wide", dict(buffs=(("speed", 0.10),))), "mega-kick": ("special", "wide", {}),
+    "close-combat": ("special", "wide", dict(buffs=(("defense", -0.12), ("spdef", -0.12)))),
+    "round": ("special", "zone", {}), "snarl": ("special", "zone", {}), "hyper-voice": ("special", "zone", {}),
+    "incinerate": ("special", "zone", {}),
+    "leafage": ("cast", "bolt", {}), "magical-leaf": ("cast", "bolt", {}), "seed-bomb": ("cast", "bolt", {}),
+    "energy-ball": ("cast", "bolt", {}), "leaf-storm": ("cast", "bolt", dict(buffs=(("spa", -0.20),))),
+    "flower-trick": ("cast", "bolt", dict(crit=1.5)),
+    "ember": ("cast", "bolt", BURN), "flamethrower": ("cast", "bolt", BURN), "fire-blast": ("cast", "bolt", BURN),
+    "overheat": ("cast", "bolt", dict(buffs=(("spa", -0.20),))),
+    "torch-song": ("cast", "bolt", dict(buffs=(("spa", 0.12),))), "shadow-ball": ("cast", "bolt", {}),
+    "hex": ("cast", "bolt", dict(status_bonus=2.0)), "water-gun": ("cast", "bolt", {}), "water-pulse": ("cast", "bolt", {}),
+    "aqua-cutter": ("cast", "bolt", dict(pierce=True, crit_rate=0.25)),
+    "air-slash": ("cast", "bolt", dict(pierce=True, stun=(0.3, 0.9))),
+}
+_spec_cache: dict = {}
+
+
+def spec_for(move_id: str) -> MoveSpec:
+    """La capacité (MoveSpec mis en cache : une même capacité est toujours le même objet)."""
+    if move_id not in _spec_cache:
+        slot, shape, flags = MOVE_PLAN[move_id]
+        _spec_cache[move_id] = from_db(move_id, shape, **flags)
+    return _spec_cache[move_id]
+
+
+def slot_of(move_id: str) -> str:
+    return MOVE_PLAN[move_id][0]
 
 
 # --- Capacités génériques (tests, ennemis ; les starters utilisent from_db) -------------------------------------------------------

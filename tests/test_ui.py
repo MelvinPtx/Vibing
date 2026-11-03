@@ -1,7 +1,8 @@
 """Tests headless des menus : python -m tests.test_ui"""
 import random
 
-from src.starters import DEFAULT_STARTER
+from src import progression as PR
+from src.starters import DEFAULT_STARTER, SPRIGATITO
 import pygame
 from pygame import Vector2
 
@@ -45,9 +46,28 @@ def test_pause_flow_in_game():
     assert g.pause is not None and g.pause.screen == "main"
     g.handle_event(key(pygame.K_ESCAPE))                    # Échap : reprendre
     assert g.pause is None and g.running
-    g.handle_event(key(pygame.K_ESCAPE)); g.handle_event(key(pygame.K_DOWN))
-    g.handle_event(key(pygame.K_DOWN)); g.handle_event(key(pygame.K_RETURN))  # Quitter
+    g.handle_event(key(pygame.K_ESCAPE))
+    for _ in range(3):                                        # Reprendre, Statut, Capacités, puis Quitter
+        g.handle_event(key(pygame.K_DOWN))
+    g.handle_event(key(pygame.K_RETURN))
     assert g.running is False
+
+
+def test_moves_screen_cycles_known_moves_and_equips_them():
+    g = Game(starter=SPRIGATITO)
+    g.player.gain_xp(0)
+    g.handle_event(key(pygame.K_ESCAPE))
+    g.handle_event(key(pygame.K_DOWN)); g.handle_event(key(pygame.K_DOWN)); g.handle_event(key(pygame.K_RETURN))
+    assert g.pause.screen == "moves"
+    p = g.player
+    p.gain_xp(PR.exp_for_level(p.growth, 15) - p.xp)                    # apprend Feuille Magik et Vive-Attaque
+    cast0 = p.moveset["cast"].name
+    g.handle_event(key(pygame.K_DOWN)); g.handle_event(key(pygame.K_DOWN))      # emplacement « cast »
+    g.handle_event(key(pygame.K_LEFT))                                          # capacité précédente
+    assert p.moveset["cast"].name != cast0 and p.manual["cast"] and p.known_for("cast")
+    g.draw()
+    g.handle_event(key(pygame.K_ESCAPE))                                        # retour au menu principal
+    assert g.pause.screen == "main"
 
 
 def test_game_over_keys():

@@ -67,39 +67,59 @@ def test_stats_follow_real_base_stats_ratios_and_sprigatito_is_rebalanced():
         assert a.max_hp < b.max_hp < c.max_hp and a.atk < b.atk < c.atk and a.speed_mult < c.speed_mult
 
 
-def test_every_move_is_a_real_move_the_form_learns_at_that_level():
+def test_each_form_learns_exactly_its_real_learnset_with_database_numbers():
     for form in ALL_FORMS:
-        learn = LEARNSET[form.dex]
-        for slot, chain in form.chains.items():
-            levels = [lv for lv, _ in chain]
-            assert levels == sorted(levels), f"{form.name}/{slot} : niveaux non croissants"
-            for lv, spec in chain:
-                assert spec.move_id in learn, f"{form.name} n'apprend pas {spec.move_id}"
-                assert learn[spec.move_id] == lv, f"{form.name}/{spec.move_id} : niveau {lv} != {learn[spec.move_id]}"
-                db = MOVES[spec.move_id]
-                assert spec.name == db["name"] and spec.power == round(db["power"] * M.POWER_SCALE, 1)
-                assert spec.element is M._TYPES[db["type"]] and spec.category.name == db["category"].upper()
+        real = LEARNSET[form.dex]
+        assert set(real) <= set(M.MOVE_PLAN), f"{form.name} : capacité réelle sans plan {set(real) - set(M.MOVE_PLAN)}"
+        assert form.learnset == real, form.name                         # toute la liste, aux niveaux réels
+        for move_id, level in real.items():
+            spec, db = M.spec_for(move_id), MOVES[move_id]
+            assert spec.move_id == move_id and spec.name == db["name"] and spec.power == round(db["power"] * M.POWER_SCALE, 1)
+            assert spec.element is M._TYPES[db["type"]] and spec.category.name == db["category"].upper()
+            assert db["desc"], f"description manquante : {move_id}"
+    assert set(LEARNSET[906]) == {"scratch", "leafage", "bite", "magical-leaf", "quick-attack", "seed-bomb", "u-turn",
+                                  "slash", "energy-ball", "play-rough"}
+    assert LEARNSET[908]["flower-trick"] == 0 and LEARNSET[911]["torch-song"] == 0 and LEARNSET[914]["aqua-step"] == 0
 
 
-def test_each_starter_line_has_its_own_moves():
-    seen = {}
-    for first in STARTERS:
-        names = {spec.name for form in lineage(first) for chain in form.chains.values() for _, spec in chain}
-        for other, o_names in seen.items():
-            assert not (names & o_names), f"{first.name} partage {names & o_names} avec {other}"
-        seen[first.name] = names
-    assert "Magie Florale" in seen["Sprigatito"] and "Chant Flamboyant" in seen["Fuecoco"] and "Danse Aquatique" in seen["Quaxly"]
+def test_signature_and_shared_moves_are_where_the_games_put_them():
+    assert "bite" in LEARNSET[906] and "bite" in LEARNSET[909]              # la Morsure est bien partagée
+    assert "flower-trick" not in LEARNSET[907] and "hex" in LEARNSET[911] and "hex" not in LEARNSET[910]
+    assert "water-gun" in LEARNSET[912] and "surf" not in LEARNSET[912]     # Quaxly n'apprend pas Surf
 
 
-def test_moves_unlock_with_level_using_real_learn_levels():
-    p = Player((0, 0), SPRIGATITO)                                  # niveau 10
-    assert (p.moveset["basic"].name, p.moveset["special"].name, p.moveset["cast"].name) == ("Griffe", "Morsure", "Feuillage")
-    res = p.gain_xp(PR.exp_for_level(p.growth, 13) - p.xp)
-    assert res.levels == [11, 12, 13] and [(s, m.name) for s, m in res.new_moves] == [("cast", "Feuille Magik")]
-    assert p.moveset["cast"].homing > 0
+def test_known_moves_grow_with_level_and_are_relearned_on_evolution():
+    p = Player((0, 0), SPRIGATITO)                                          # niveau 10
+    assert p.known == ["leafage", "scratch", "bite"]
     res = p.gain_xp(PR.exp_for_level(p.growth, 15) - p.xp)
-    assert [(s, m.name) for s, m in res.new_moves] == [("basic", "Vive-Attaque")] and p.moveset["basic"].cooldown < 0.25
-    assert SPRIGATITO.next_unlock(15) is None or SPRIGATITO.next_unlock(15)[0] > 15
+    assert [m.name for _, m in res.new_moves] == ["Feuille Magik", "Vive-Attaque"] and "seed-bomb" not in p.known
+    p.gain_xp(PR.exp_for_level(p.growth, 16) - p.xp)
+    p.evolve()                                                             # Floragato : mêmes capacités, pas de Canon Graine avant le niveau 20
+    assert p.known == ["leafage", "scratch", "bite", "magical-leaf", "quick-attack"]
+    p.gain_xp(PR.exp_for_level(p.growth, 20) - p.xp)
+    assert p.known[-1] == "seed-bomb" and p.moveset["cast"].name == "Canon Graine"
+
+
+def test_equip_choice_persists_and_every_form_has_all_three_slots():
+    p = Player((0, 0), SPRIGATITO)
+    assert (p.moveset["basic"].name, p.moveset["special"].name, p.moveset["cast"].name) == ("Griffe", "Morsure", "Feuillage")
+    p.gain_xp(PR.exp_for_level(p.growth, 15) - p.xp)
+    assert p.moveset["cast"].name == "Feuille Magik" and p.moveset["basic"].name == "Vive-Attaque"   # dernière apprise
+    assert p.equip("cast", "leafage") and p.moveset["cast"].name == "Feuillage"
+    assert not p.equip("cast", "scratch") and not p.equip("cast", "seed-bomb")                       # mauvais emplacement / inconnue
+    p.gain_xp(PR.exp_for_level(p.growth, 15) - p.xp + 1)
+    assert p.moveset["cast"].name == "Feuillage"                                                     # le choix manuel reste
+    for form in ALL_FORMS:
+        level = {1: 10, 2: 16, 3: 36}[form.stage]
+        q = Player((0, 0), form, level=level)
+        assert set(q.moveset) == {"basic", "special", "cast"}, (form.name, q.moveset)
+        assert all(q.known_for(slot) for slot in q.moveset)
+
+
+def test_next_unlock_points_at_the_real_next_move():
+    lv, spec = SPRIGATITO.next_unlock(10)
+    assert (lv, spec.name) == (13, "Feuille Magik")
+    assert lineage(QUAXLY)[1].next_unlock(36)[1].name == "Acrobatie" and lineage(QUAXLY)[2].next_unlock(64) is None
 
 
 # --- joueur : niveau, évolution, bonus --------------------------------------------------------
@@ -122,17 +142,19 @@ def test_evolution_changes_form_types_moves_and_heals_half():
     p.evolve()
     assert (p.name, p.species, p.form.stage) == ("Crocalor", 910, 2) and p.modifiers == ["objet"]
     assert p.hp >= 10 + 0.5 * p.max_hp - 1e-6 and p.max_hp > 125
-    assert p.moveset["cast"].name == "Flammèche"                  # Calcination n'est apprise qu'au niveau 17
+    assert p.moveset["cast"].name == "Flammèche" and "incinerate" in p.known        # apprise par Fuecoco au niveau 15
+    assert p.moveset["special"].name == "Calcination" and "snarl" not in p.known    # Aboiement : niveau 24
     assert p.gain_xp(0).evolve_to is None                          # la forme 3 attend le niveau 36
     p.gain_xp(PR.exp_for_level(p.growth, 36) - p.xp)
     assert p.gain_xp(0).evolve_to.name == "Skeledirge"
     p.evolve()
-    assert [t.value for t in p.types] == ["Feu", "Spectre"] and p.moveset["cast"].name == "Chant Flamboyant"
+    assert [t.value for t in p.types] == ["Feu", "Spectre"] and "torch-song" in p.known       # apprise à l'évolution
 
 
 def test_buffs_stack_to_three_and_expire():
     skel = lineage(FUECOCO)[2]
     p = Player((500, 500), skel, level=36)
+    assert p.equip("cast", "torch-song")
     c = PlayerController(p, ARENA)
     base = p.stat("spa")
     for _ in range(4):
@@ -143,6 +165,7 @@ def test_buffs_stack_to_three_and_expire():
         c.update(Intent(), DT)
     assert not p.buffs and abs(p.stat("spa") - base) < 1e-9
     q = Player((500, 500), lineage(QUAXLY)[2], level=36)
+    assert q.equip("special", "aqua-step")
     v0 = q.move_speed
     PlayerController(q, ARENA).update(Intent(attack="special"), DT)
     assert abs(q.move_speed - v0 * 1.10) < 1e-9                                    # Danse Aquatique : +10 % de vitesse

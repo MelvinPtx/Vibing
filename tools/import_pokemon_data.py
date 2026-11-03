@@ -3,7 +3,7 @@
 - pokemondb/database : types, stats de base, taux de croissance, expérience de base, et chiffres
   de chaque capacité (type, catégorie, puissance, précision, PP, priorité) ;
 - PokeAPI/pokeapi (CSV) : ce que la base pokemondb ne contient pas : capacités apprises par niveau
-  dans Écarlate/Violet, noms français des capacités, niveaux d'évolution.
+  dans Écarlate/Violet, noms français des capacités, leur description officielle française, niveaux d'évolution.
 
     python -m tools.import_pokemon_data
 
@@ -61,6 +61,12 @@ def main() -> None:
     move_rows = {int(r["id"]): r["identifier"] for r in csv.DictReader(io.StringIO(fetch(f"{API}/moves.csv")))}
     fr = {int(r["move_id"]): r["name"].replace("’", "'")
           for r in csv.DictReader(io.StringIO(fetch(f"{API}/move_names.csv"))) if int(r["local_language_id"]) == LANG_FR}
+    flavor = {}                                   # description officielle FR : Écarlate/Violet, sinon la plus récente
+    for r in csv.DictReader(io.StringIO(fetch(f"{API}/move_flavor_text.csv"))):
+        if int(r["language_id"]) == LANG_FR:
+            mid, vg = int(r["move_id"]), int(r["version_group_id"])
+            if mid not in flavor or vg > flavor[mid][0]:
+                flavor[mid] = (vg, " ".join(r["flavor_text"].replace("\f", " ").split()).replace("’", "'"))
     playable_ids = {dex[k] for k in PLAYABLE}
     learnset = {d: {} for d in playable_ids}
     for r in csv.DictReader(io.StringIO(fetch(f"{API}/pokemon_moves.csv"))):
@@ -84,12 +90,13 @@ def main() -> None:
     lines = ['"""Données Pokémon : GÉNÉRÉ par tools/import_pokemon_data.py (ne pas modifier à la main).',
              "", "Sources : pokemondb/database (types, stats, expérience de base, chiffres des capacités) et",
              "PokeAPI/pokeapi (capacités apprises par niveau dans Écarlate/Violet, noms français, évolutions).",
-             '"""', "", "# identifiant -> {nom FR, type, catégorie, puissance, précision (101 = ne rate jamais), PP, priorité}",
+             '"""', "", "# identifiant -> {nom FR, type, catégorie, puissance, précision (101 = ne rate jamais), PP, priorité, description FR}",
              "MOVES = {"]
     for m in used:
         d = moves_db[m]
         lines.append(f'    {m!r}: {{"name": {fr[name_to_id[m]]!r}, "type": {d["type"]!r}, "category": {d["category"]!r}, '
-                     f'"power": {d["power"]}, "accuracy": {d["accuracy"]}, "pp": {d["pp"]}, "priority": {d["priority"]}}},')
+                     f'"power": {d["power"]}, "accuracy": {d["accuracy"]}, "pp": {d["pp"]}, "priority": {d["priority"]}, '
+                     f'"desc": {flavor.get(name_to_id[m], (0, ""))[1]!r}}},')
     lines += ["}", "", "# n° national -> nom, types, stats de base, taux de croissance, expérience de base", "POKEMON = {"]
     for k in PLAYABLE + OTHERS:
         e, s = forms[k], forms[k]["stats"]

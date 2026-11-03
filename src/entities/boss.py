@@ -67,6 +67,12 @@ class Boss(Enemy):
         if not self.hidden:
             super().draw(surface)
 
+    def stun(self, seconds: float) -> None:      # les boss ne sont ni apeurés ni paralysés
+        pass
+
+    def slow(self, seconds: float) -> None:
+        pass
+
     # --- outils pour écrire les attaques ---
     def after(self, delay: float, fn) -> None:
         self._timers.append([delay, fn])

@@ -113,7 +113,7 @@ class Game:
             if chosen:
                 self.pick_reward(chosen)
         elif self.pause:                                  # menu pause : capte tout
-            res = self.pause.handle_event(e)
+            res = self.pause.handle_event(e, self.player)
             if res == "resume":
                 self.pause = None
             elif res == "quit":

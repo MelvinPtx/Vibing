@@ -13,7 +13,8 @@ from .. import settings as S
 from ..geometry import resolve
 from ..data.pokedex import POKEMON
 from ..progression import START_LEVEL, exp_for_level, hp_mult, stat_mult
-from ..starters import DEFAULT_STARTER, Starter
+from ..combat.moves import slot_of, spec_for
+from ..starters import DEFAULT_STARTER, Starter, auto_equip
 from .entity import Entity, Stats
 
 
@@ -58,6 +59,9 @@ class Player(Entity):
         self.trail: list[tuple[Vector2, float]] = []  # images rémanentes
         self.moveset: dict = {}
         self.atk_cd: dict = {}
+        self.known: list = starter.known_at(level)        # identifiants des capacités apprises, dans l'ordre
+        self.manual: dict = {}                            # emplacement -> capacité choisie à la main
+        self.lunge_left, self.lunge_vec = 0.0, Vector2()
         self._adopt_form(starter)
         self.hp = self.max_hp
 
@@ -69,6 +73,9 @@ class Player(Entity):
     def _adopt_form(self, form: Starter) -> None:
         self.form = form
         self.name, self.species, self.types = form.name, form.dex, form.types
+        for m in form.known_at(self.level):               # comme le Rappel Capacité d'Écarlate/Violet
+            if m not in self.known:
+                self.known.append(m)
         self.recalc()
         self.refresh_moves()
 
@@ -82,13 +89,26 @@ class Player(Entity):
         self.speed_mult = f.speed_mult
 
     def refresh_moves(self) -> list:
-        """Capacités de l'emplacement à ce niveau ; renvoie celles qui viennent de changer."""
-        new = self.form.moves_at(self.level)
+        """Recalcule les capacités équipées (choix manuel ou dernière apprise) ; renvoie celles qui changent."""
+        equipped = auto_equip(self.known, self.manual)
+        new = {slot: spec_for(m) for slot, m in equipped.items()}
         changed = [(slot, spec) for slot, spec in new.items() if self.moveset.get(slot) is not spec]
         self.moveset = new
         for slot in new:
             self.atk_cd.setdefault(slot, 0.0)
         return changed
+
+    def known_for(self, slot: str) -> list:
+        """Capacités apprises utilisables sur cet emplacement."""
+        return [m for m in self.known if slot_of(m) == slot]
+
+    def equip(self, slot: str, move_id: str) -> bool:
+        """Équipe une capacité apprise sur son emplacement (choix du menu « Capacités »)."""
+        if move_id not in self.known or slot_of(move_id) != slot:
+            return False
+        self.manual[slot] = move_id
+        self.refresh_moves()
+        return True
 
     @property
     def xp_into_level(self) -> int:
@@ -101,12 +121,17 @@ class Player(Entity):
     def gain_xp(self, amount: float) -> LevelUp:
         res = LevelUp()
         self.xp += amount
+        before = self.level
         while self.level < 100 and self.xp >= exp_for_level(self.growth, self.level + 1):
             self.level += 1
             res.levels.append(self.level)
         if res.levels:
             self.recalc()
-            res.new_moves = [m for m in self.refresh_moves() if m[1] is not None]
+            for m, lv in sorted(self.form.learnset.items(), key=lambda kv: (kv[1], kv[0])):
+                if before < lv <= self.level and m not in self.known:     # apprend les capacités de ces niveaux
+                    self.known.append(m)
+                    res.new_moves.append((slot_of(m), spec_for(m)))
+            self.refresh_moves()
             self.hp = min(self.max_hp, self.hp + 0.15 * self.max_hp)     # petit soin à chaque montée
         f = self.form
         if f.evolves_to and self.level >= f.evolve_level:
@@ -115,9 +140,10 @@ class Player(Entity):
 
     def evolve(self) -> list:
         """Adopte la forme suivante (types, stats, capacités, sprite) et soigne de moitié."""
+        old_known = set(self.known)
         self._adopt_form(self.form.evolves_to)
         self.hp = min(self.max_hp, self.hp + 0.5 * self.max_hp)
-        return list(self.moveset.items())
+        return [(slot_of(m), spec_for(m)) for m in self.known if m not in old_known]     # apprises à l'évolution
 
     # --- bonus temporaires (Chant Flamboyant, Danse Aquatique...) ---
     def add_buff(self, stat: str, amount: float) -> None:
@@ -237,6 +263,9 @@ class PlayerController:
             p.dash_cd_left = S.DASH_COOLDOWN
 
         # Déplacement
+        if p.lunge_left > 0:                                    # élan d'une attaque qui fonce
+            p.pos += p.lunge_vec * dt
+            p.lunge_left -= dt
         if p.dashing:
             p.pos += self._dash_dir * S.DASH_SPEED * dt
             p.trail.append((Vector2(p.pos), 1.0))
@@ -258,8 +287,10 @@ class PlayerController:
             atk = spec.build(p, Vector2(p.facing))
             atk.slot = intent.attack
             p.act_anim, p.act_left = spec.anim, 0.35
-            if spec.buff:
-                p.add_buff(*spec.buff)
+            for stat, amount in spec.buffs:
+                p.add_buff(stat, amount)
+            if spec.lunge:                                   # Vive-Attaque, Aqua-Jet, Aquatacle : il fonce en avant
+                p.lunge_left, p.lunge_vec = 0.12, Vector2(p.facing) * spec.lunge / 0.12
             p.act_nonce += 1
             for mod in p.modifiers:
                 mod.on_attack(atk, p)

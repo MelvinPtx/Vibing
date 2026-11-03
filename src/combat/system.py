@@ -66,6 +66,11 @@ class CombatSystem:
         for atk in self.attacks:
             self._steer(atk, targets, dt)
             atk.update(dt)
+            if atk.rehit and atk.time_left > 0:                   # multi-coups : chaque coup peut toucher de nouveau
+                phase = int((atk.duration - atk.time_left) / atk.rehit)
+                if phase != getattr(atk, "_phase", 0):
+                    atk._phase = phase
+                    atk.hit.clear()
             for t in targets:
                 if not t.alive or id(t) in atk.hit or t is atk.owner or not atk.overlaps(t):
                     continue
