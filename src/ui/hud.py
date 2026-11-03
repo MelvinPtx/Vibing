@@ -27,16 +27,21 @@ class HUD:
         self._player_panel(surface, player, room_number, sprites)
         if room_number:
             self._room_panel(surface, player, room_number, enemies_left)
-        T.prompt_bar(surface, [("Clic G", "Attaque"), ("E", "Tranch'Herbe"), ("R", "Ball'Ombre"),
-                               ("Espace", "Dash"), ("Échap", "Menu")],
-                     S.SCREEN_W - 28, S.SCREEN_H - 24)
+        m = player.moveset                       # les capacités dépendent du starter
+        T.prompt_bar(surface, [("Clic G", m["basic"].name), ("E", m["special"].name),
+                               ("R", m["cast"].name), ("Espace", "Dash"), ("Échap", "Menu")],
+                     S.SCREEN_W - 28, S.SCREEN_H - 24, size=14, gap=12)
 
     def _player_panel(self, surface, p, room_number, sprites=None) -> None:
-        r = pygame.Rect(24, S.SCREEN_H - 158, 308, 140)
+        r = pygame.Rect(24, S.SCREEN_H - 158, 292, 140)
         T.alpha_rect(surface, r, T.NAVY, 185, 14)
         T.lv_pill(surface, f"Salle {room_number}" if room_number else "Entraînement",
                   topleft=(r.x + 16, r.y + 12))
-        T.text(surface, p.name, 24, T.WHITE, shadow=True, topleft=(r.x + 16, r.y + 38))
+        nm = T.text(surface, p.name, 24, T.WHITE, shadow=True, topleft=(r.x + 16, r.y + 38))
+        ix = nm.right + 14
+        for t in p.types:                       # icônes de type du Pokémon
+            T.draw_type_icon(surface, t, (ix + 12, nm.centery + 1), 24)
+            ix += 28
         if sprites:   # icône du Pokémon, comme dans la liste d'équipe
             sprites.draw_icon(surface, p.species, (r.right - 52, r.y + 40), "Idle", 0, 3)
         T.hp_bar(surface, (r.x + 14, r.y + 70, r.w - 28, 26), p.hp / p.max_hp,

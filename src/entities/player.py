@@ -10,10 +10,8 @@ import pygame
 from pygame import Vector2
 
 from .. import settings as S
-from ..combat.moves import COOLDOWNS, MOVE_ANIMS, MOVES
-from ..combat.types import PType
-from ..species import PLAYER_DEX
-from .entity import Entity
+from ..starters import DEFAULT_STARTER, Starter
+from .entity import Entity, Stats
 
 
 @dataclass
@@ -25,15 +23,19 @@ class Intent:
 
 
 class Player(Entity):
-    species = PLAYER_DEX
+    """Le Pokémon contrôlé : ses types, stats, PV, vitesse et capacités viennent du `Starter`."""
 
-    def __init__(self, pos):
-        super().__init__(pos, S.PLAYER_RADIUS, S.YELLOW, types=(PType.NORMAL,),
-                         max_hp=S.PLAYER_MAX_HP)
-        self.name = S.PLAYER_NAME
+    def __init__(self, pos, starter: Starter = DEFAULT_STARTER):
+        super().__init__(pos, S.PLAYER_RADIUS, S.YELLOW, types=starter.types, max_hp=starter.max_hp)
+        self.starter = starter
+        self.name = starter.name
+        self.species = starter.dex
+        self.stats = Stats(starter.atk, starter.spa, starter.defense, starter.spdef)
+        self.speed_mult = starter.speed_mult
+        self.moveset = dict(starter.moves)            # emplacement -> MoveSpec
         self.moving = False
         self.act_anim, self.act_left, self.act_nonce = "Attack", 0.0, 0   # animation d'attaque en cours
-        self.atk_cd = {k: 0.0 for k in COOLDOWNS}
+        self.atk_cd = {slot: 0.0 for slot in self.moveset}
         self.modifiers: list = []   # Modifier actifs (src/items)
         self.facing = Vector2(1, 0)
         # État du dash (écrit par le contrôleur, lu par le rendu / le combat)
@@ -42,6 +44,10 @@ class Player(Entity):
         self.hurt_left = 0.0   # invincibilité après avoir été touché
         self.dash_cd_left = 0.0
         self.trail: list[tuple[Vector2, float]] = []  # images rémanentes
+
+    @property
+    def dying(self) -> bool:          # le K.O. du joueur est géré par l'écran de fin
+        return False
 
     @property
     def invincible(self) -> bool:
@@ -140,22 +146,23 @@ class PlayerController:
             if self._dash_time <= 0:
                 p.dashing = False
         else:
-            p.pos += move * S.PLAYER_SPEED * dt
+            p.pos += move * S.PLAYER_SPEED * p.speed_mult * dt
 
         self._clamp(p)
 
         spawned = []
-        if intent.attack in MOVES and p.atk_cd[intent.attack] <= 0 and not p.dashing:
+        if intent.attack in p.moveset and p.atk_cd[intent.attack] <= 0 and not p.dashing:
             if intent.aim is not None and (intent.aim - p.pos).length_squared() > 1:
                 p.facing = (intent.aim - p.pos).normalize()
-            atk = MOVES[intent.attack](p, Vector2(p.facing))
+            spec = p.moveset[intent.attack]
+            atk = spec.build(p, Vector2(p.facing))
             atk.slot = intent.attack
-            p.act_anim, p.act_left = MOVE_ANIMS[intent.attack], 0.35
+            p.act_anim, p.act_left = spec.anim, 0.35
             p.act_nonce += 1
             for mod in p.modifiers:
                 mod.on_attack(atk, p)
             spawned.append(atk)
-            p.atk_cd[intent.attack] = COOLDOWNS[intent.attack]
+            p.atk_cd[intent.attack] = spec.cooldown
         return spawned
 
     def _clamp(self, p: Player) -> None:

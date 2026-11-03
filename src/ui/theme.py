@@ -9,7 +9,11 @@
 
 Uniquement des helpers de dessin : aucune logique de jeu.
 """
+from pathlib import Path
+
 import pygame
+
+ICON_DIR = Path(__file__).resolve().parents[2] / "assets" / "icons" / "types"
 
 # --- Palette -----------------------------------------------------------------
 NAVY = (22, 30, 54)
@@ -31,13 +35,13 @@ KIND_COLORS = {          # par RewardKind.name
     "CAPSULE": (130, 86, 214),
     "SOIN": (60, 184, 112),
 }
-TYPE_COLORS = {          # par PType.name
-    "NORMAL": (168, 168, 120), "FEU": (240, 128, 48), "EAU": (104, 144, 240),
-    "ELECTRIK": (248, 208, 48), "PLANTE": (120, 200, 80), "GLACE": (110, 204, 214),
-    "COMBAT": (192, 48, 40), "POISON": (160, 64, 160), "SOL": (224, 192, 104),
-    "VOL": (168, 144, 240), "PSY": (248, 88, 136), "INSECTE": (168, 184, 32),
-    "ROCHE": (184, 160, 56), "SPECTRE": (112, 88, 152), "DRAGON": (112, 56, 248),
-    "TENEBRES": (104, 84, 72), "ACIER": (150, 164, 196), "FEE": (238, 120, 168),
+TYPE_COLORS = {          # par PType.name : couleur d'origine des icônes (assets/icons/types)
+    "NORMAL": (144, 153, 162), "FEU": (254, 156, 85), "EAU": (77, 144, 214),
+    "ELECTRIK": (244, 210, 59), "PLANTE": (101, 188, 94), "GLACE": (115, 206, 191),
+    "COMBAT": (206, 63, 107), "POISON": (171, 106, 200), "SOL": (217, 119, 70),
+    "VOL": (143, 168, 222), "PSY": (249, 112, 119), "INSECTE": (144, 192, 44),
+    "ROCHE": (201, 182, 139), "SPECTRE": (82, 105, 173), "DRAGON": (9, 109, 195),
+    "TENEBRES": (91, 82, 101), "ACIER": (91, 142, 161), "FEE": (236, 144, 231),
 }
 
 # --- Polices -------------------------------------------------------------------
@@ -149,20 +153,50 @@ def thin_bar(surface, rect, ratio: float, color) -> None:
 
 
 # --- Pastilles de type ------------------------------------------------------------
+_type_icons: dict = {}
+
+
+def type_icon(ptype, size: int):
+    """Icône ronde du type (assets/icons/types/<type>.png), mise à l'échelle et mise en cache ;
+    None si le fichier manque."""
+    key = (ptype.name, size)
+    if key not in _type_icons:
+        path = ICON_DIR / f"{ptype.name.lower()}.png"
+        img = None
+        if path.exists():
+            img = pygame.image.load(str(path))
+            if pygame.display.get_surface() is not None:
+                img = img.convert_alpha()
+            img = pygame.transform.smoothscale(img, (size, size))
+        _type_icons[key] = img
+    return _type_icons[key]
+
+
+def draw_type_icon(surface, ptype, center, size: int) -> None:
+    """Icône du type ; à défaut, un disque coloré avec l'initiale."""
+    img = type_icon(ptype, size)
+    if img is not None:
+        surface.blit(img, img.get_rect(center=center))
+        return
+    col = TYPE_COLORS[ptype.name]
+    pygame.draw.circle(surface, col, center, size // 2)
+    text(surface, ptype.value[0].upper(), max(9, size // 2), WHITE, center=center)
+
+
 def type_pill(surface, ptype, h: int = 26, **anchor) -> pygame.Rect:
+    """Pastille de type : fond de la couleur du type, icône ronde cerclée de blanc à gauche."""
     col = TYPE_COLORS[ptype.name]
     label = ptype.value.upper()
-    f = font(max(9, int(h * 0.5)))
-    w = f.size(label)[0] + h + 14
+    size = max(9, int(h * 0.5))
+    w = font(size).size(label)[0] + h + 14
     r = pygame.Rect(0, 0, w, h)
     for k, v in anchor.items():
         setattr(r, k, v)
     pygame.draw.rect(surface, col, r, border_radius=h // 2)
     c = (r.x + h // 2, r.centery)
-    pygame.draw.circle(surface, (255, 255, 255), c, h // 2 - 3)
-    text(surface, ptype.value[0].upper(), max(9, int(h * 0.5)), col, center=c)
-    text(surface, label, max(9, int(h * 0.5)), WHITE, shadow=True,
-         center=(r.x + h + (r.w - h) // 2 - 2, r.centery))
+    pygame.draw.circle(surface, WHITE, c, h // 2 - 1)
+    draw_type_icon(surface, ptype, c, h - 4)
+    text(surface, label, size, WHITE, shadow=True, center=(r.x + h + (r.w - h) // 2 - 2, r.centery))
     return r
 
 
@@ -179,18 +213,24 @@ def type_pills(surface, types, center_x: int, top: int, h: int = 18, gap: int = 
 _pat_cache: dict = {}
 
 
-def band(surface, rect, color, pat, line_at: str = "top") -> pygame.Rect:
-    """Bandeau plein + motif de cercles discret + liseré doré sur le bord extérieur."""
+def pattern_fill(surface, rect, color, pat, alpha: int = 95) -> pygame.Rect:
+    """Aplat + motif de cercles discret (fond des bandeaux et de l'écran de choix du starter)."""
     rect = pygame.Rect(rect)
     pygame.draw.rect(surface, color, rect)
-    key = (rect.size, pat)
+    key = (rect.size, pat, alpha)
     if key not in _pat_cache:
         s = pygame.Surface(rect.size, pygame.SRCALPHA)
         for row, y in enumerate(range(10, rect.h, 30)):
             for x in range(15 if row % 2 else 0, rect.w + 30, 30):
-                pygame.draw.circle(s, (*pat, 95), (x, y), 11, 3)
+                pygame.draw.circle(s, (*pat, alpha), (x, y), 11, 3)
         _pat_cache[key] = s
     surface.blit(_pat_cache[key], rect.topleft)
+    return rect
+
+
+def band(surface, rect, color, pat, line_at: str = "top") -> pygame.Rect:
+    """Bandeau plein + motif de cercles discret + liseré doré sur le bord extérieur."""
+    rect = pattern_fill(surface, rect, color, pat)
     ly = rect.top if line_at == "top" else rect.bottom - 4
     pygame.draw.rect(surface, GOLD, (rect.x, ly, rect.w, 4))
     return rect
@@ -236,12 +276,12 @@ def footer(surface, hints, color, pat) -> None:
     draw_prompts(surface, hints, w - 36, h - 28)
 
 
-def prompt_bar(surface, hints, right: int, bottom: int, size: int = 15) -> pygame.Rect:
+def prompt_bar(surface, hints, right: int, bottom: int, size: int = 15, gap: int = 18) -> pygame.Rect:
     """Petite barre flottante d'indications de touches (translucide)."""
-    tw = prompts_width(hints, 18, size)
+    tw = prompts_width(hints, gap, size)
     r = pygame.Rect(right - tw - 32, bottom - 38, tw + 32, 38)
     alpha_rect(surface, r, NAVY, 190, 19)
-    draw_prompts(surface, hints, r.right - 16, r.centery, 18, size)
+    draw_prompts(surface, hints, r.right - 16, r.centery, gap, size)
     return r
 
 

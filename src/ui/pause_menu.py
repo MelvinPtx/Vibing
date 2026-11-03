@@ -4,7 +4,6 @@ import pygame
 from pygame import Vector2
 
 from .. import settings as S
-from ..combat.moves import MOVES
 from . import theme as T
 
 ITEMS = [("Reprendre", "resume"), ("Statut", "status"), ("Quitter", "quit")]
@@ -17,7 +16,7 @@ def move_infos(player):
     """Capacités telles qu'elles seront lancées (modificateurs inclus)."""
     out = []
     for slot, key in MOVE_SLOTS:
-        a = MOVES[slot](player, Vector2(1, 0))
+        a = player.moveset[slot].build(player, Vector2(1, 0))
         a.slot = slot
         for m in player.modifiers:
             m.on_attack(a, player)
@@ -151,9 +150,7 @@ class PauseMenu:
         for i, (name, ptype, power, cat, key) in enumerate(move_infos(player)):
             rr = pygame.Rect(vx, y + 136 + i * 58, 424, 52)
             T.alpha_rect(surface, rr, T.NAVY_ROW, 200, 9)
-            sq = pygame.Rect(rr.x + 8, rr.y + 8, 36, 36)
-            pygame.draw.rect(surface, T.TYPE_COLORS[ptype.name], sq, border_radius=9)
-            pygame.draw.rect(surface, (255, 255, 255), sq, 2, border_radius=9)
+            T.draw_type_icon(surface, ptype, (rr.x + 26, rr.centery), 38)
             T.text(surface, name, 20, T.WHITE, topleft=(rr.x + 58, rr.y + 6))
             T.text(surface, f"[{key}]  {cat} · puissance {power:.0f}", 13, T.GREY, False,
                    topleft=(rr.x + 58, rr.y + 30))

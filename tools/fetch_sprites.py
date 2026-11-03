@@ -17,7 +17,7 @@ from src.species import ALL_DEX, NAMES
 
 RAW = "https://raw.githubusercontent.com/PMDCollab/SpriteCollab/master"
 OUT = Path(__file__).resolve().parents[1] / "assets" / "sprites"
-ANIMS = ("Idle", "Walk", "Attack", "Swing", "Shoot", "Hurt")   # planches utilisées par le jeu
+ANIMS = ("Idle", "Walk", "Attack", "Swing", "Shoot", "Hurt", "Faint")   # planches utilisées par le jeu
 
 
 def get(url: str) -> bytes | None:

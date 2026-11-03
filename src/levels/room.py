@@ -7,7 +7,11 @@ import pygame
 from pygame import Vector2
 
 from .. import settings as S
-from ..entities.enemy import Rattata
+from ..entities.enemy import Fantominus, Racaillou, Rattata, Voltorbe, Zubat
+
+
+# (classe, première salle où elle apparaît, poids de tirage) : la difficulté monte avec les salles
+ENEMY_TABLE = [(Rattata, 1, 5), (Zubat, 2, 3), (Racaillou, 3, 2), (Fantominus, 4, 2), (Voltorbe, 5, 2)]
 
 
 class RewardKind(Enum):
@@ -34,7 +38,8 @@ class RoomManager:
         self.player = player
         self.rng = rng or random.Random()
         self.room_number = 0
-        self.enemies: list = []
+        self.enemies: list = []          # vivants + ceux dont l'animation de mort est en cours
+        self.out_attacks: list = []     # attaques hostiles à confier au CombatSystem (drain_attacks)
         self.doors: list[Door] = []
         self.state = RoomState.COMBAT
         self.start_room()
@@ -46,7 +51,11 @@ class RoomManager:
         self.doors = []
         self.player.pos = Vector2(self.arena.centerx, self.arena.bottom - 60)
         count = min(2 + self.room_number, 10)
-        self.enemies = [Rattata(self._spawn_point()) for _ in range(count)]
+        pool = [(cls, w) for cls, first, w in ENEMY_TABLE if first <= self.room_number]
+        classes, weights = zip(*pool)
+        self.enemies = [cls(self._spawn_point())
+                        for cls in self.rng.choices(classes, weights=weights, k=count)]
+        self.out_attacks = []
 
     def _spawn_point(self) -> Vector2:
         for _ in range(50):
@@ -72,6 +81,15 @@ class RoomManager:
         return [e for e in self.enemies if e.vulnerable]
 
     @property
+    def alive_count(self) -> int:
+        return sum(e.alive for e in self.enemies)
+
+    def drain_attacks(self) -> list:
+        """Attaques hostiles créées depuis le dernier appel (tirs, explosions)."""
+        out, self.out_attacks = self.out_attacks, []
+        return out
+
+    @property
     def exits_locked(self) -> bool:
         return self.state is RoomState.COMBAT
 
@@ -80,10 +98,16 @@ class RoomManager:
         if self.state is RoomState.COMBAT:
             for e in self.enemies:
                 e.update(dt, self.player, self.enemies, self.arena)
+                self.out_attacks.extend(e.out_attacks)
+                e.out_attacks.clear()
                 if e.can_touch(self.player) and self.player.take_damage(e.contact_damage):
                     e.register_hit()
-            self.enemies = [e for e in self.enemies if e.alive]
-            if not self.enemies:
+        else:                                    # salle vidée : les morts finissent leur animation
+            for e in self.enemies:
+                e.update(dt)
+        self.enemies = [e for e in self.enemies if e.alive or e.dying]
+        if self.state is RoomState.COMBAT:
+            if not self.alive_count:
                 self._open_doors()
             return None
         for d in self.doors:

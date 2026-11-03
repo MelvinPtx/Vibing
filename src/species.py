@@ -1,9 +1,9 @@
 """Espèces utilisées par le jeu (numéro de Pokédex national) : données pures, sans pygame.
 Les sprites viennent de PMDCollab/SpriteCollab (voir assets/sprites/CREDITS.md)."""
 from .combat.types import PType
+from .starters import STARTERS
 
-PLAYER_DEX = 133          # Évoli (Normal)
-RATTATA_DEX = 19          # Rattata (Normal)
+RATTATA_DEX, ZUBAT_DEX, GEODUDE_DEX, GASTLY_DEX, VOLTORB_DEX = 19, 41, 74, 92, 100
 
 # Mannequins d'entraînement : un vrai Pokémon par cas de test de la table des types.
 # (nom, n° Pokédex, types)
@@ -16,5 +16,10 @@ DUMMY_ROSTER = [
     ("Paras", 46, (PType.INSECTE, PType.PLANTE)),
 ]
 
-NAMES = {PLAYER_DEX: "Évoli", RATTATA_DEX: "Rattata", **{d: n for n, d, _ in DUMMY_ROSTER}}
+NAMES = {
+    **{s.dex: s.name for s in STARTERS},
+    RATTATA_DEX: "Rattata", ZUBAT_DEX: "Zubat", GEODUDE_DEX: "Racaillou",
+    GASTLY_DEX: "Fantominus", VOLTORB_DEX: "Voltorbe",
+    **{d: n for n, d, _ in DUMMY_ROSTER},
+}
 ALL_DEX = sorted(NAMES)

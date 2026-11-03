@@ -16,11 +16,14 @@ from pathlib import Path
 
 import pygame
 
+from .. import settings as S
+
 ASSET_DIR = Path(__file__).resolve().parents[2] / "assets" / "sprites"
 TICK = 1 / 60
 LOOPING = frozenset({"Idle", "Walk"})
 FALLBACKS = {"Swing": ("Attack",), "Shoot": ("Attack",), "Attack": ("Idle",),
-             "Hurt": ("Idle",), "Walk": ("Idle",)}
+             "Hurt": ("Idle",), "Walk": ("Idle",), "Faint": ("Hurt", "Idle")}
+DEATH_FLASH = 0.12   # s : flash blanc au moment de la mort
 CYAN_TINT = (0, 70, 90)
 
 
@@ -159,6 +162,8 @@ class SpriteRenderer:
         sset = self.get(getattr(entity, "species", None))
         if sset is None or not entity.sprite_visible:
             return False
+        if getattr(entity, "dying", False):
+            return self._draw_dying(surface, entity, sset)
         name, speed = entity.sprite_anim
         anim = sset.anim(name)
         nonce = getattr(entity, "sprite_nonce", 0)
@@ -182,6 +187,35 @@ class SpriteRenderer:
         tint = getattr(entity, "sprite_tint", None)
         img = self._tint(frame, tint) if tint else frame
         surface.blit(img, img.get_rect(center=(x, y)))
+        return True
+
+    def _draw_dying(self, surface, entity, sset) -> bool:
+        """Mort : flash blanc, puis l'animation « Faint » si l'espèce en a une (sinon la pose
+        « Hurt » qui s'écrase), pendant que le sprite s'estompe."""
+        t, total = entity.death_t, S.DEATH_DURATION
+        faint = sset.anims.get("Faint")
+        direction = direction_index(entity.facing)
+        if faint:
+            anim, idx = faint, faint.index_at(t * max(1.0, faint.total / 0.5), False)
+        else:
+            anim, idx = sset.anim("Hurt"), 0
+        frame = sset.frame(anim, direction, idx, self.scale)
+        x, y = round(entity.pos.x), round(entity.pos.y)
+        k = max(0.0, min(1.0, (t - DEATH_FLASH) / (total - DEATH_FLASH)))   # 0 -> 1 pendant le fondu
+        r = entity.radius
+        if k < 0.6:
+            self._shadow(surface, (x, y + int(r * 0.55)), int(r * 2.0), int(r * 0.75))
+        img = self._tint(frame, (210, 210, 210)) if t < DEATH_FLASH else frame
+        rect = img.get_rect(center=(x, y))
+        if k > 0:
+            if not faint:                                   # écrasement vertical, pieds au sol
+                h = max(2, int(frame.get_height() * (1 - 0.45 * k)))
+                img = pygame.transform.scale(img, (frame.get_width(), h))
+                rect = img.get_rect(midbottom=(x, y + frame.get_height() // 2))
+            else:
+                img = img.copy()
+            img.set_alpha(int(255 * (1 - k)))
+        surface.blit(img, rect)
         return True
 
     # --- icônes d'interface (HUD, menus) -------------------------------------------

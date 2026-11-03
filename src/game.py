@@ -7,11 +7,15 @@ from .entities import Intent, Player, PlayerController, TrainingDummy
 from .items import apply_reward, roll_choices
 from .levels import RoomManager
 from .species import DUMMY_ROSTER
+from .starters import DEFAULT_STARTER
 from .ui import HUD
+from .ui import theme as T
+from .ui.effects import Effects
 from .ui.floating_text import FloatingTexts
 from .ui.pause_menu import PauseMenu
 from .ui.reward_menu import RewardMenu
 from .ui.room_view import RoomView
+from .ui.starter_select import StarterSelect
 from .ui.sprites import SpriteRenderer
 
 MOVE_KEYS = {
@@ -25,7 +29,8 @@ ATTACK_KEYS = {pygame.K_e: "special", pygame.K_r: "cast", pygame.K_j: "basic"}
 
 
 class Game:
-    def __init__(self, training: bool = False):
+    def __init__(self, training: bool = False, starter=None):
+        """`starter` : démarre directement avec ce Pokémon ; sinon l'écran de choix s'affiche."""
         pygame.init()
         self.screen = pygame.display.set_mode((S.SCREEN_W, S.SCREEN_H))
         pygame.display.set_caption(S.TITLE)
@@ -37,17 +42,20 @@ class Game:
         self.view = RoomView()
         self.sprites = SpriteRenderer()
         self.texts = FloatingTexts()
+        self.effects = Effects()
         self.running = True
-        self.reset()
+        self.select = None if starter else StarterSelect()
+        self.reset(starter or DEFAULT_STARTER)
 
-    def reset(self) -> None:
-        """(Re)lance une partie."""
-        self.player = Player(self.arena.center)
+    def reset(self, starter=DEFAULT_STARTER) -> None:
+        """(Re)lance une partie avec ce starter."""
+        self.player = Player(self.arena.center, starter)
         self.controller = PlayerController(self.player, self.arena)
         self.combat = CombatSystem()
         self.menu = None
         self.pause = None
         self.texts.items.clear()
+        self.effects = Effects()
         if self.training:
             self.room = None
             n = len(DUMMY_ROSTER)
@@ -74,6 +82,14 @@ class Game:
         """Traite un événement pygame. Renvoie "dash" / "basic" / "special" / "cast" ou None."""
         if e.type == pygame.QUIT:
             self.running = False
+        elif self.select:                                 # choix du starter : capte tout
+            if e.type == pygame.KEYDOWN and e.key == pygame.K_ESCAPE:
+                self.running = False
+                return None
+            chosen = self.select.handle_event(e)
+            if chosen:
+                self.select = None
+                self.reset(chosen)
         elif self.menu:                                   # menu de récompense : capte tout
             chosen = self.menu.handle_event(e)
             if chosen:
@@ -90,7 +106,7 @@ class Game:
             else:
                 self.pause = PauseMenu()
         elif e.type == pygame.KEYDOWN and e.key == pygame.K_RETURN and self.game_over:
-            self.reset()
+            self.select = StarterSelect()                 # nouvelle partie : on rechoisit son starter
         elif e.type == pygame.KEYDOWN and e.key in DASH_KEYS:
             return "dash"
         elif e.type == pygame.KEYDOWN and e.key in ATTACK_KEYS:
@@ -121,31 +137,47 @@ class Game:
         self.menu = None
 
     def update(self, intent: Intent, dt: float) -> None:
-        if self.game_over or self.menu or self.pause:
+        if self.select or self.game_over or self.menu or self.pause:
             return
         for atk in self.controller.update(intent, dt):
             self.combat.spawn(atk)
         if self.room:
             reward = self.room.update(dt)
             if reward:
-                self.combat.attacks.clear()
+                self.combat.clear()
                 self.menu = RewardMenu(roll_choices(reward, self.player))
                 return
             targets = self.room.targets
+            for atk in self.room.drain_attacks():           # tirs et explosions ennemis
+                self.combat.spawn_hostile(atk)
         else:
             for d in self.dummies:
                 d.update(dt)
             targets = self.dummies
-        self.combat.update(dt, targets)
+        self.combat.update(dt, targets, self.player)
         for target, res, atk in self.combat.events:
             color = S.RED if res.multiplier > 1 else (S.GREY if res.multiplier < 1 else S.WHITE)
             self.texts.add(target.pos - Vector2(0, 50), f"{res.amount:.0f}", color)
             if res.label:
                 self.texts.add(target.pos - Vector2(0, 70), res.label, color)
+        for target, res, atk in self.combat.hurt_events:    # le joueur est touché
+            self.texts.add(target.pos - Vector2(0, 56), f"-{res.amount:.0f}" if res.amount else "0", T.RED)
+            if res.label:
+                self.texts.add(target.pos - Vector2(0, 78), res.label, T.YELLOW)
+        for e in (self.room.enemies if self.room else self.dummies):   # mort : éclats + onde de choc
+            if e.death_fresh:
+                e.death_fresh = False
+                color = T.TYPE_COLORS[e.types[0].name] if e.types else T.WHITE
+                self.effects.burst(e.pos, color)
+        self.effects.update(dt)
         self.texts.update(dt)
         self.sprites.update(dt)
 
     def draw(self) -> None:
+        if self.select:
+            self.select.draw(self.screen, self.sprites)
+            pygame.display.flip()
+            return
         self.screen.fill(S.BG)
         if self.room:
             self.view.draw(self.screen, self.room)
@@ -160,6 +192,11 @@ class Game:
                 e.draw(self.screen)             # pas de sprite : cercle de secours
         for a in self.combat.attacks:
             pygame.draw.circle(self.screen, (255, 255, 255), a.pos, a.radius, 2)
+        for a in self.combat.hostile:                       # attaques ennemies : couleur du type
+            col = T.TYPE_COLORS[a.element.name]
+            pygame.draw.circle(self.screen, col, a.pos, a.radius, 0 if a.radius < 40 else 5)
+            pygame.draw.circle(self.screen, (255, 255, 255), a.pos, a.radius, 2)
+        self.effects.draw(self.screen)
         self.hud.draw_world(self.screen, entities, show_types=self.training)
         self.texts.draw(self.screen)
         room_number = self.room.room_number if self.room else 0
@@ -171,5 +208,5 @@ class Game:
             self.view.draw_game_over(self.screen, self.player, room_number)
         else:
             self.hud.draw(self.screen, self.player, self.clock.get_fps(), room_number,
-                          len(self.room.enemies) if self.room else 0, self.sprites)
+                          self.room.alive_count if self.room else 0, self.sprites)
         pygame.display.flip()

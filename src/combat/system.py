@@ -9,14 +9,24 @@ class CombatSystem:
     """
 
     def __init__(self):
-        self.attacks: list[Attack] = []
-        self.events = []  # (target, DamageResult, attack) du dernier update
+        self.attacks: list[Attack] = []      # attaques du joueur (touchent les ennemis)
+        self.hostile: list[Attack] = []      # attaques ennemies (touchent le joueur)
+        self.events = []         # (cible, DamageResult, attaque) : le joueur a touché
+        self.hurt_events = []    # (joueur, DamageResult, attaque) : le joueur a été touché
 
     def spawn(self, attack: Attack) -> None:
         self.attacks.append(attack)
 
-    def update(self, dt: float, targets) -> None:
+    def spawn_hostile(self, attack: Attack) -> None:
+        self.hostile.append(attack)
+
+    def clear(self) -> None:
+        self.attacks.clear()
+        self.hostile.clear()
+
+    def update(self, dt: float, targets, player=None) -> None:
         self.events = []
+        self.hurt_events = []
         for atk in self.attacks:
             atk.update(dt)
             for t in targets:
@@ -32,3 +42,19 @@ class CombatSystem:
                     atk.kill()
                     break
         self.attacks = [a for a in self.attacks if a.active]
+        self._update_hostile(dt, player)
+
+    def _update_hostile(self, dt: float, player) -> None:
+        for atk in self.hostile:
+            atk.update(dt)
+            if player is None or not player.alive or id(player) in atk.hit or not atk.overlaps(player):
+                continue
+            res = compute_damage(atk, player)
+            if res.multiplier == 0 or player.take_damage(res.amount):
+                # Touché (ou immunisé). Si le joueur est invincible (dash), rien n'est consommé :
+                # le projectile continue sa route -> esquive.
+                atk.hit.add(id(player))
+                self.hurt_events.append((player, res, atk))
+                if not atk.pierce:
+                    atk.kill()
+        self.hostile = [a for a in self.hostile if a.active]

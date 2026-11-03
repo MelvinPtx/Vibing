@@ -2,6 +2,7 @@
 import tempfile
 from pathlib import Path
 
+from src.starters import DEFAULT_STARTER
 import pygame
 from pygame import Vector2
 
@@ -57,7 +58,7 @@ def test_parse_slice_copyof_and_timing():
 def test_missing_species_falls_back_to_circles():
     assert load_sprite_set(9999) is None
     r = SpriteRenderer(root=Path(tempfile.gettempdir()) / "no-sprites-here")
-    g = Game()
+    g = Game(starter=DEFAULT_STARTER)
     g.sprites = r
     for _ in range(5):
         g.update(Intent(), 1 / 60)
@@ -67,9 +68,10 @@ def test_missing_species_falls_back_to_circles():
 
 def test_renderer_restarts_one_shot_on_new_action():
     with tempfile.TemporaryDirectory() as tmp:
-        fake_species(Path(tmp), 133)
+        g = Game(starter=DEFAULT_STARTER)
+        fake_species(Path(tmp), g.player.species)
         r = SpriteRenderer(root=Path(tmp), scale=1)
-        g = Game(); g.sprites = r
+        g.sprites = r
         p = g.player
         p.act_anim, p.act_left = "Attack", 1.0
         p.act_nonce += 1
@@ -92,7 +94,7 @@ def test_all_game_species_have_assets_and_credits():
 
 
 def test_game_renders_with_sprites_in_every_state():
-    g = Game()
+    g = Game(starter=DEFAULT_STARTER)
     for _ in range(60):
         g.update(Intent(move=Vector2(1, 0)), 1 / 60)
     g.draw()
@@ -101,7 +103,7 @@ def test_game_renders_with_sprites_in_every_state():
         g.player.atk_cd[slot] = 0
         g.update(Intent(attack=slot, aim=Vector2(600, 300)), 1 / 60); g.draw()
     g.player.take_damage(10); g.draw()                                    # Hurt + clignotement
-    t = Game(training=True)
+    t = Game(training=True, starter=DEFAULT_STARTER)
     for _ in range(10):
         t.update(Intent(attack="basic", aim=Vector2(200, 190)), 1 / 60)
     t.draw()

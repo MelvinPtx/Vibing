@@ -1,6 +1,7 @@
 """Tests headless : python -m tests.test_items"""
 import random
 
+from src.starters import DEFAULT_STARTER
 import pygame
 from pygame import Vector2
 
@@ -83,7 +84,7 @@ def test_roll_choices_distinct_and_excludes_owned():
 
 def test_full_flow_door_menu_pick():
     from src.game import Game
-    g = Game()
+    g = Game(starter=DEFAULT_STARTER)
     for _ in range(60):
         g.update(Intent(), DT)
     for e in g.room.enemies:

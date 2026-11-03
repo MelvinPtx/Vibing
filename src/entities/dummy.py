@@ -40,12 +40,16 @@ class TrainingDummy(Entity):
     def update(self, dt: float) -> None:
         self.flash = max(0.0, self.flash - dt)
         self.tick_status(dt)
+        self.tick_death(dt)
         if not self.alive:
             self.respawn -= dt
             if self.respawn <= 0:
-                self.alive, self.hp = True, self.max_hp
+                self.alive, self.hp, self.death_t = True, self.max_hp, None
 
-    def draw(self, surface) -> None:
+    def draw(self, surface) -> None:     # cercle de secours (sans sprite)
+        if self.dying:
+            pygame.draw.circle(surface, self.color, self.pos, max(1, self.radius * (1 - self.death_t / S.DEATH_DURATION)))
+            return
         if not self.alive:
             return
         color = S.WHITE if self.flash > 0 else self.color

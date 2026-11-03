@@ -45,7 +45,7 @@ def test_system_hits_once_and_projectile_dies():
     cs.spawn(balle_ombre(me, Vector2(1, 0)))
     for _ in range(60):
         cs.update(1 / 60, [t])
-    assert t.hp == 1000 - 25 * 2 and not cs.attacks  # Spectre > Psy, un seul impact
+    assert abs(t.hp - (1000 - 25 * 1.1 * 2)) < 1e-9 and not cs.attacks  # Spectre > Psy x2, Atq. Spé. 1,1 ; un seul impact
 
 
 def test_player_spawns_attack_with_cooldown():

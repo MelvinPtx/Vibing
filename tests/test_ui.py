@@ -1,6 +1,7 @@
 """Tests headless des menus : python -m tests.test_ui"""
 import random
 
+from src.starters import DEFAULT_STARTER
 import pygame
 from pygame import Vector2
 
@@ -20,7 +21,7 @@ def key(k):
 
 
 def test_reward_menu_navigation():
-    g = Game()
+    g = Game(starter=DEFAULT_STARTER)
     m = RewardMenu(roll_choices(RewardKind.OBJET, g.player, random.Random(1)))
     n = len(m.choices)
     assert n == 3 and m.index == 0
@@ -33,7 +34,7 @@ def test_reward_menu_navigation():
 
 
 def test_pause_flow_in_game():
-    g = Game()
+    g = Game(starter=DEFAULT_STARTER)
     assert g.handle_event(key(pygame.K_ESCAPE)) is None and g.pause is not None
     pos = Vector2(g.player.pos)
     g.update(Intent(move=Vector2(1, 0)), 0.5)
@@ -50,24 +51,26 @@ def test_pause_flow_in_game():
 
 
 def test_game_over_keys():
-    g = Game()
+    g = Game(starter=DEFAULT_STARTER)
     g.player.hp = 0
-    g.handle_event(key(pygame.K_RETURN))
-    assert g.player.hp == g.player.max_hp
+    g.handle_event(key(pygame.K_RETURN))                    # Entrée : retour au choix du starter
+    assert g.select is not None
+    g.handle_event(key(pygame.K_2))                         # 2e starter (Fuecoco) : nouvelle partie
+    assert g.select is None and g.player.hp == g.player.max_hp and g.player.name == "Fuecoco"
     g.player.hp = 0
     g.handle_event(key(pygame.K_ESCAPE))
     assert g.running is False
 
 
 def test_status_shows_modified_moves():
-    g = Game()
+    g = Game(starter=DEFAULT_STARTER)
     apply_reward(g.player, Charbon())
     names = {n: e.value for n, e, *_ in move_infos(g.player)}
     assert names["Vive-Attaque"] == "Feu" and names["Tranch'Herbe"] == "Plante"
 
 
 def test_every_screen_renders():
-    g = Game()
+    g = Game(starter=DEFAULT_STARTER)
     apply_reward(g.player, Charbon()); apply_reward(g.player, Restes())
     for _ in range(70):
         g.update(Intent(), DT)
@@ -77,7 +80,7 @@ def test_every_screen_renders():
     g.pause = PauseMenu(); g.draw()
     g.pause.screen = "status"; g.draw(); g.pause = None
     g.player.hp = 0; g.draw()                                 # K.O.
-    t = Game(training=True); t.draw()                         # mode entraînement
+    t = Game(training=True, starter=DEFAULT_STARTER); t.draw()                         # mode entraînement
 
 
 if __name__ == "__main__":

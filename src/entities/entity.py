@@ -3,6 +3,8 @@ from dataclasses import dataclass
 import pygame
 from pygame import Vector2
 
+from .. import settings as S
+
 
 @dataclass
 class Stats:
@@ -28,6 +30,8 @@ class Entity:
         self.stats = Stats()
         self.max_hp = max_hp
         self.hp = max_hp
+        self.death_t = None        # secondes écoulées depuis la mort (None = vivant)
+        self.death_fresh = False   # True le temps d'une frame : l'UI y lance les effets de mort
         self.burn_left = 0.0
         self.burn_dps = 0.0
         self._burn_tick = 0.0
@@ -35,7 +39,7 @@ class Entity:
     # --- infos lues par le rendu de sprites (src/ui/sprites.py) ---
     @property
     def sprite_visible(self) -> bool:
-        return self.alive
+        return self.alive or self.dying
 
     @property
     def sprite_anim(self) -> tuple:
@@ -53,7 +57,17 @@ class Entity:
         self.hp = max(0, self.hp - amount)
         if self.hp == 0:
             self.alive = False
+            self.death_t, self.death_fresh = 0.0, True
         return True
+
+    @property
+    def dying(self) -> bool:
+        """Mort depuis moins de DEATH_DURATION : l'animation de mort est en cours."""
+        return not self.alive and self.death_t is not None and self.death_t < S.DEATH_DURATION
+
+    def tick_death(self, dt: float) -> None:
+        if not self.alive and self.death_t is not None:
+            self.death_t += dt
 
     def apply_burn(self, duration: float, dps: float) -> None:
         self.burn_left = max(self.burn_left, duration)
