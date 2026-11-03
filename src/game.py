@@ -10,6 +10,7 @@ from .species import DUMMY_ROSTER
 from .starters import DEFAULT_STARTER
 from .ui import HUD
 from .ui import theme as T
+from .ui.attack_fx import AttackFX
 from .ui.effects import Effects
 from .ui.floating_text import FloatingTexts
 from .ui.pause_menu import PauseMenu
@@ -45,6 +46,7 @@ class Game:
         self.sprites = SpriteRenderer()
         self.texts = FloatingTexts()
         self.effects = Effects()
+        self.fx = AttackFX()
         self.running = True
         self.select = None if starter else StarterSelect()
         self.reset(starter or DEFAULT_STARTER)
@@ -58,6 +60,7 @@ class Game:
         self.pause = None
         self.texts.items.clear()
         self.effects = Effects()
+        self.fx = AttackFX()
         if self.training:
             self.room = None
             n = len(DUMMY_ROSTER)
@@ -150,16 +153,19 @@ class Game:
         self.controller.obstacles = self.room.obstacles if self.room else []
         for atk in self.controller.update(intent, dt):
             self.combat.spawn(atk)
+            self.fx.spawn(atk)
         if self.room:
             reward = self.room.update(dt)
             if reward:
                 self.combat.clear()
+                self.fx = AttackFX()                        # plus aucune attaque en vol
                 self.menu = RewardMenu(roll_choices(reward, self.player))
                 self._announce_boss()
                 return
             targets = self.room.targets
             for atk in self.room.drain_attacks():           # tirs et explosions ennemis
                 self.combat.spawn_hostile(atk)
+                self.fx.spawn(atk, hostile=True)
         else:
             for d in self.dummies:
                 d.update(dt)
@@ -178,11 +184,13 @@ class Game:
             if self.banner[2] <= 0:
                 self.banner = None
         for target, res, atk in self.combat.events:
+            self.fx.hit(target.pos, atk.element, res.multiplier > 1)
             color = S.RED if res.multiplier > 1 else (S.GREY if res.multiplier < 1 else S.WHITE)
             self.texts.add(target.pos - Vector2(0, 50), f"{res.amount:.0f}", color)
             if res.label:
                 self.texts.add(target.pos - Vector2(0, 70), res.label, color)
         for target, res, atk in self.combat.hurt_events:    # le joueur est touché
+            self.fx.hit(target.pos, atk.element, res.multiplier > 1)
             self.texts.add(target.pos - Vector2(0, 56), f"-{res.amount:.0f}" if res.amount else "0", T.RED)
             if res.label:
                 self.texts.add(target.pos - Vector2(0, 78), res.label, T.YELLOW)
@@ -192,6 +200,7 @@ class Game:
                 color = T.TYPE_COLORS[e.types[0].name] if e.types else T.WHITE
                 self.effects.burst(e.pos, color, 46 if getattr(e, "is_boss", False) else 14)
         self.effects.update(dt)
+        self.fx.update(dt)
         self.texts.update(dt)
         self.sprites.update(dt)
 
@@ -214,12 +223,7 @@ class Game:
                 e.draw_status(self.screen)
             else:
                 e.draw(self.screen)             # pas de sprite : cercle de secours
-        for a in self.combat.attacks:
-            pygame.draw.circle(self.screen, (255, 255, 255), a.pos, a.radius, 2)
-        for a in self.combat.hostile:                       # attaques ennemies : couleur du type
-            col = T.TYPE_COLORS[a.element.name]
-            pygame.draw.circle(self.screen, col, a.pos, a.radius, 0 if a.radius < 40 else 5)
-            pygame.draw.circle(self.screen, (255, 255, 255), a.pos, a.radius, 2)
+        self.fx.draw(self.screen)                           # animations d'attaque (joueur et ennemis)
         self.effects.draw(self.screen)
         self.hud.draw_world(self.screen, entities, show_types=self.training)
         self.texts.draw(self.screen)

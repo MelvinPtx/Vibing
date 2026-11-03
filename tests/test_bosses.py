@@ -193,6 +193,28 @@ def test_rockfall_marks_five_spots_then_drops_rocks():
     assert len([a for a in b.out_attacks if a.name == "Éboulement"]) == 5
 
 
+def test_flying_shooter_above_a_rock_still_fires_but_the_player_cannot_shoot_through_walls():
+    rock = pygame.Rect(470, 220, 60, 60)
+    b, p = ready(Ectoplasma((500, 250), rng=random.Random(5))), Player((500, 560))   # il survole le pilier
+    b.atk_ring(p)
+    run(b, p, 0.9)
+    shots = [a for a in b.out_attacks if a.name == "Ball'Ombre"]
+    cs = CombatSystem()
+    for a in shots:
+        cs.spawn_hostile(a)
+    cs.update(DT, [], p, [rock])
+    assert len(cs.hostile) == 10, "les tirs nés sous le boss ne doivent pas s'écraser sur son propre pilier"
+    for _ in range(40):                                      # une fois sortis, un autre rocher les arrête
+        cs.update(DT, [], p, [rock, pygame.Rect(700, 150, 60, 200)])
+    assert len(cs.hostile) < 10
+    owner = Player((100, 100))                               # le joueur collé à un mur : tir bloqué sur-le-champ
+    wall = pygame.Rect(110, 80, 40, 60)
+    cs2 = CombatSystem()
+    cs2.spawn(M.BALLE_OMBRE.build(owner, Vector2(1, 0)))
+    cs2.update(DT, [], None, [wall])
+    assert not cs2.attacks
+
+
 def test_phases_trigger_at_thresholds_and_summon_minions():
     p = Player((500, 560))
     m = RoomManager(ROOM, p, random.Random(4), start_number=5)

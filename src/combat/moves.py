@@ -28,11 +28,12 @@ class MoveSpec:
     def build_at(self, owner, pos) -> Attack:
         """Zone posée à un endroit fixe (Séisme, éboulement...), qui ne suit pas le lanceur."""
         return Attack(owner=owner, element=self.element, category=self.category, power=self.power,
-                      radius=self.radius, duration=self.duration, name=self.name, pos=Vector2(pos))
+                      radius=self.radius, duration=self.duration, name=self.name, pos=Vector2(pos),
+                      kind="zone")
 
     def build(self, owner, direction: Vector2) -> Attack:
         common = dict(owner=owner, element=self.element, category=self.category, power=self.power,
-                      radius=self.radius, duration=self.duration, name=self.name)
+                      radius=self.radius, duration=self.duration, name=self.name, kind=self.kind)
         if self.kind == "melee":
             return Attack(pos=owner.pos, offset=direction * self.reach, **common)
         if self.kind == "burst":

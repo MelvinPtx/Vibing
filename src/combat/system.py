@@ -27,8 +27,21 @@ class CombatSystem:
 
     @staticmethod
     def _blocked(atk: Attack, obstacles) -> bool:
-        """Un projectile (non perforant) s'arrête contre un rocher ; mêlée et zones passent."""
-        return not atk.pierce and any(circle_hits_rect(atk.pos, atk.radius, o) for o in obstacles)
+        """Un projectile (non perforant) s'arrête contre un rocher ; mêlée et zones passent.
+
+        Exception : le tir d'un tireur *volant* (Ectoplasma, Fantominus) qui survole un rocher naît
+        à l'intérieur de celui-ci ; il le traverse au lieu de s'y écraser tout de suite. Cette
+        exemption n'existe pas pour le joueur (sinon il tirerait à travers un mur en s'y collant) et
+        s'arrête dès que le projectile a quitté le rocher."""
+        if atk.pierce:
+            return False
+        if getattr(atk.owner, "flies", False):
+            if not hasattr(atk, "_exempt"):
+                atk._exempt = {id(o) for o in obstacles if circle_hits_rect(atk.pos, atk.radius, o)}
+            atk._exempt = {i for i in atk._exempt
+                           if any(id(o) == i and circle_hits_rect(atk.pos, atk.radius, o) for o in obstacles)}
+            return any(id(o) not in atk._exempt and circle_hits_rect(atk.pos, atk.radius, o) for o in obstacles)
+        return any(circle_hits_rect(atk.pos, atk.radius, o) for o in obstacles)
 
     def update(self, dt: float, targets, player=None, obstacles=()) -> None:
         self.events = []

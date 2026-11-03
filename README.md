@@ -14,6 +14,7 @@ python -m tests.test_ui        # tests headless menus (navigation, pause, rendu)
 python -m tests.test_sprites   # tests headless sprites (découpage, animations, crédits)
 python -m tests.test_content   # tests headless starters, ennemis, mort, icônes de type
 python -m tests.test_bosses    # tests headless obstacles, navigation, boss
+python -m tests.test_fx        # tests headless animations d'attaque
 ```
 Au lancement, on choisit son starter (Sprigatito, Fuecoco ou Quaxly). Contrôles : ZQSD / WASD / flèches = bouger · Espace / Maj / clic droit = Dash · clic gauche / E / R = attaques · Échap = menu pause (Reprendre / Statut / Quitter).
 
@@ -29,6 +30,7 @@ Au lancement, on choisit son starter (Sprigatito, Fuecoco ou Quaxly). Contrôles
 - `src/entities/boss.py` : boss à phases (Onix, Ectoplasma) et zones de danger annoncées.
 - `src/starters.py` : les 3 starters (types, stats, capacités propres) ; STAB x1,5 pour les capacités de son type.
 - `src/species.py` : espèces utilisées (n° de Pokédex) : Évoli (joueur), Rattata, mannequins.
+- `src/ui/attack_fx.py` : animations d'attaque dessinées par le code (un style par type).
 - `src/ui/sprites.py` : sprites animés PMD (8 directions, Idle/Walk/Attack/Swing/Shoot/Hurt).
 - `src/ui/` : interface au style Pokémon Écarlate/Violet : `theme.py` (palette, bandeaux, curseur, jauges, pastilles de type), `hud.py`, `reward_menu.py`, `pause_menu.py` (menu + statut), `room_view.py`.
 
@@ -70,3 +72,10 @@ Chacun a 3 phases (à 60 % et 30 % de PV) et ses attaques sont **annoncées au s
 - **Ectoplasma** (Spectre/Poison, vole) : volées et anneau de Ball'Ombre, téléportation + Poing Ombre, bombes
   toxiques ; invoque des Fantominus. Normal est sans effet sur lui.
 Vaincre un boss rend la moitié des PV.
+
+## Animations d'attaque
+Effets **originaux, dessinés par le code** (aucun asset tiers) dans `src/ui/attack_fx.py` : une coupe en croissant pour
+la mêlée, une onde de choc avec éclats pour les zones, une orbe à traînée pour les projectiles (qui finit en impact),
+et un flash sur la cible touchée (plus gros si super efficace). Chaque type a sa palette et sa forme d'éclat : flammes,
+gouttes, feuilles, éclairs, éclats de glace, bulles, rochers, volutes spectrales, étoiles de fée... Les attaques ennemies
+ont un liseré rouge pour qu'on les repère. Les animations vivent plus longtemps que les hitbox (très brèves).
