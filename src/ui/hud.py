@@ -35,10 +35,11 @@ class HUD:
                      S.SCREEN_W - 28, S.SCREEN_H - 24, size=14, gap=12)
 
     def _player_panel(self, surface, p, room_number, sprites=None) -> None:
-        r = pygame.Rect(24, S.SCREEN_H - 158, 292, 140)
+        r = pygame.Rect(24, S.SCREEN_H - 176, 292, 158)
         T.alpha_rect(surface, r, T.NAVY, 185, 14)
-        T.lv_pill(surface, f"Salle {room_number}" if room_number else "Entraînement",
-                  topleft=(r.x + 16, r.y + 12))
+        pill = T.lv_pill(surface, f"Salle {room_number}" if room_number else "Entraînement",
+                         topleft=(r.x + 16, r.y + 12))
+        T.lv_pill(surface, f"Niv. {p.level}", 14, topleft=(pill.right + 8, pill.y))      # niveau, comme en combat
         nm = T.text(surface, p.name, 24, T.WHITE, shadow=True, topleft=(r.x + 16, r.y + 38))
         ix = nm.right + 14
         for t in p.types:                       # icônes de type du Pokémon
@@ -48,12 +49,19 @@ class HUD:
             sprites.draw_icon(surface, p.species, (r.right - 52, r.y + 40), "Idle", 0, 3)
         T.hp_bar(surface, (r.x + 14, r.y + 70, r.w - 28, 26), p.hp / p.max_hp,
                  f"{p.hp:.0f}/{p.max_hp:.0f}")
+        T.text(surface, "EXP", 12, T.LABEL, topleft=(r.x + 16, r.y + 102))
+        T.thin_bar(surface, (r.x + 70, r.y + 105, r.w - 86, 8), p.xp_into_level / max(1, p.xp_span), T.CYAN)
         ready = 1 - p.dash_cd_left / S.DASH_COOLDOWN
-        T.text(surface, "DASH", 12, T.LABEL, topleft=(r.x + 16, r.y + 104))
-        T.thin_bar(surface, (r.x + 70, r.y + 107, r.w - 86, 8), ready, T.LIME if ready >= 1 else T.AMBER)
-        T.text(surface, "I-FRAMES", 12, T.LABEL, topleft=(r.x + 16, r.y + 120))
-        T.thin_bar(surface, (r.x + 94, r.y + 123, r.w - 110, 8),
-                   p.iframes_left / S.DASH_IFRAMES, T.CYAN)
+        T.text(surface, "DASH", 12, T.LABEL, topleft=(r.x + 16, r.y + 118))
+        T.thin_bar(surface, (r.x + 70, r.y + 121, r.w - 86, 8), ready, T.LIME if ready >= 1 else T.AMBER)
+        T.text(surface, "I-FRAMES", 12, T.LABEL, topleft=(r.x + 16, r.y + 134))
+        T.thin_bar(surface, (r.x + 94, r.y + 137, r.w - 110, 8),
+                   p.iframes_left / S.DASH_IFRAMES, T.WHITE)
+        x = r.x                                                      # bonus temporaires (Chant Flamboyant, ...)
+        for stat, (stacks, left, amount) in p.buffs.items():
+            label = {"spa": "Atq. Spé.", "atk": "Attaque", "speed": "Vitesse"}.get(stat, stat)
+            x = T.pill(surface, f"{label} +{round(stacks * amount * 100)}%", 12, T.VIOLET, T.WHITE,
+                       pad=(10, 3), bottomleft=(x, r.y - 6)).right + 6
 
     def _boss_bar(self, surface, boss) -> None:
         """Grande barre de PV du boss en haut de l'écran, avec les seuils de phase."""

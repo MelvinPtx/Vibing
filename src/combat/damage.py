@@ -28,9 +28,9 @@ def compute_damage(attack: Attack, target) -> DamageResult:
     de l'attaque est un type du lanceur)."""
     owner = attack.owner
     if attack.category is Category.PHYSICAL:
-        ratio = owner.stats.atk / target.stats.defense
+        ratio = owner.stat("atk") / target.stat("defense")
     else:
-        ratio = owner.stats.spa / target.stats.spdef
+        ratio = owner.stat("spa") / target.stat("spdef")
     mult = effectiveness(attack.element, target.types)
     stab = STAB if attack.element in getattr(owner, "types", ()) else 1.0
     return DamageResult(attack.power * ratio * mult * stab, mult)

@@ -13,6 +13,7 @@ from src.game import Game
 from src.geometry import circle_hits_rect, push_out, resolve
 from src.levels import RoomManager, RoomState
 from src.levels.obstacles import DOOR_ZONE, LAYOUTS, NavGrid, _keepouts, generate_layout
+from src.progression import enemy_hp_mult
 from src.starters import DEFAULT_STARTER
 
 DT = 1 / 60
@@ -139,7 +140,7 @@ def test_boss_rooms_every_five_rooms_alternate_and_scale():
         assert m.enemies == [m.boss] and isinstance(m.boss, cls) and m.layout in ("pillars", "open")
         assert m.boss.level == level
         base = 1000 if cls is Onix else 760
-        assert abs(m.boss.max_hp - base * (1 + 0.6 * level)) < 1e-9
+        assert abs(m.boss.max_hp - base * (1 + 0.6 * level) * enemy_hp_mult(number)) < 1e-9   # cycle x salle
     assert RoomManager(ROOM, p, random.Random(3), start_number=6).boss is None
 
 

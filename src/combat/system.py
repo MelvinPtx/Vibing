@@ -1,5 +1,7 @@
-from .attack import Attack
+import math
+
 from ..geometry import circle_hits_rect
+from .attack import Attack
 from .damage import compute_damage
 
 
@@ -26,6 +28,21 @@ class CombatSystem:
         self.hostile.clear()
 
     @staticmethod
+    def _steer(atk: Attack, targets, dt: float) -> None:
+        """Projectile à tête chercheuse (capacités qui ne ratent jamais) : se courbe vers l'ennemi
+        le plus proche, dans la limite de sa vitesse de rotation."""
+        if not atk.homing or atk.velocity.length_squared() == 0:
+            return
+        near = min((t for t in targets if t.alive and id(t) not in atk.hit), key=lambda t: t.pos.distance_squared_to(atk.pos),
+                   default=None)
+        if near is None or near.pos.distance_to(atk.pos) > 420:
+            return
+        diff = atk.velocity.angle_to(near.pos - atk.pos)
+        diff = (diff + 180) % 360 - 180
+        turn = math.degrees(atk.homing * dt)
+        atk.velocity = atk.velocity.rotate(max(-turn, min(turn, diff)))
+
+    @staticmethod
     def _blocked(atk: Attack, obstacles) -> bool:
         """Un projectile (non perforant) s'arrête contre un rocher ; mêlée et zones passent.
 
@@ -33,7 +50,7 @@ class CombatSystem:
         à l'intérieur de celui-ci ; il le traverse au lieu de s'y écraser tout de suite. Cette
         exemption n'existe pas pour le joueur (sinon il tirerait à travers un mur en s'y collant) et
         s'arrête dès que le projectile a quitté le rocher."""
-        if atk.pierce:
+        if atk.kind != "projectile":
             return False
         if getattr(atk.owner, "flies", False):
             if not hasattr(atk, "_exempt"):
@@ -47,6 +64,7 @@ class CombatSystem:
         self.events = []
         self.hurt_events = []
         for atk in self.attacks:
+            self._steer(atk, targets, dt)
             atk.update(dt)
             for t in targets:
                 if not t.alive or id(t) in atk.hit or t is atk.owner or not atk.overlaps(t):

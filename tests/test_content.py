@@ -37,8 +37,10 @@ def test_starters_types_stats_and_moves():
     assert [s.types for s in STARTERS] == [(PType.PLANTE,), (PType.FEU,), (PType.EAU,)]
     p = Player((500, 500), FUECOCO)
     assert (p.name, p.species, p.max_hp, p.hp) == ("Fuecoco", 909, 125, 125) and p.stats.spa == 1.1
-    atk = PlayerController(p, ARENA).update(Intent(attack="special"), DT)[0]
-    assert atk.element is PType.FEU and atk.name == "Lance-Flammes"
+    ctl = PlayerController(p, ARENA)
+    atk = ctl.update(Intent(attack="cast"), DT)[0]
+    assert atk.element is PType.FEU and atk.name == "Flammèche" and atk.kind == "projectile"
+    assert ctl.update(Intent(attack="special"), DT)[0].name == "Chant Canon"
     q, c = Player((500, 500), QUAXLY), None
     c = PlayerController(q, ARENA)
     for _ in range(60):
@@ -46,12 +48,15 @@ def test_starters_types_stats_and_moves():
     assert abs(q.pos.x - (500 + S.PLAYER_SPEED * 1.08)) < 1
 
 
-def test_every_starter_has_three_distinct_slots():
+def test_every_starter_has_three_slots_and_a_unique_moveset():
+    seen = set()
     for s in STARTERS:
         assert set(s.moves) == {"basic", "special", "cast"}
-        assert s.moves["basic"].kind == "melee" and s.moves["special"].kind == "burst"
-        assert s.moves["cast"].kind == "projectile"
-    assert len({s.moves["special"].element for s in STARTERS}) == 3
+        assert s.moves["basic"].kind == "melee" and s.moves["cast"].kind == "projectile"
+        names = {m.name for m in s.moves.values()}
+        assert not (names & seen), "deux starters partagent une capacité"
+        seen |= names
+    assert [s.moves["cast"].element for s in STARTERS] == [PType.PLANTE, PType.FEU, PType.EAU]
 
 
 def test_stab_boosts_own_type_moves_only():

@@ -1,7 +1,7 @@
 """Espèces utilisées par le jeu (numéro de Pokédex national) : données pures, sans pygame.
 Les sprites viennent de PMDCollab/SpriteCollab (voir assets/sprites/CREDITS.md)."""
 from .combat.types import PType
-from .starters import STARTERS
+from .starters import ALL_FORMS
 
 RATTATA_DEX, ZUBAT_DEX, GEODUDE_DEX, GASTLY_DEX, VOLTORB_DEX = 19, 41, 74, 92, 100
 GENGAR_DEX, ONIX_DEX = 94, 95    # boss
@@ -18,7 +18,7 @@ DUMMY_ROSTER = [
 ]
 
 NAMES = {
-    **{s.dex: s.name for s in STARTERS},
+    **{s.dex: s.name for s in ALL_FORMS},   # les 3 starters et leurs 6 évolutions
     RATTATA_DEX: "Rattata", ZUBAT_DEX: "Zubat", GEODUDE_DEX: "Racaillou",
     GASTLY_DEX: "Fantominus", VOLTORB_DEX: "Voltorbe", GENGAR_DEX: "Ectoplasma", ONIX_DEX: "Onix",
     **{d: n for n, d, _ in DUMMY_ROSTER},

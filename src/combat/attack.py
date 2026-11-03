@@ -28,6 +28,7 @@ class Attack:
         self.offset = Vector2(offset) if offset is not None else None  # colle au lanceur
         self.pierce = pierce          # False : disparaît au premier impact
         self.name = name
+        self.homing = 0.0             # rad/s : se courbe vers l'ennemi le plus proche
         self.kind = kind              # "melee" | "burst" | "zone" (posée au sol) | "projectile" : sert au rendu
         self.slot = slot              # "basic" | "special" | "cast" (lu par les modificateurs)
         self.hit: set[int] = set()    # une cible n'est touchée qu'une fois par attaque

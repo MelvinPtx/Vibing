@@ -16,5 +16,11 @@ Sprites issus de [PMDCollab/SpriteCollab](https://github.com/PMDCollab/SpriteCol
 - **#0152 Germignon** : CHUNSOFT (https://www.spike-chunsoft.com/)
 - **#0200 Feuforêve** : CHUNSOFT (https://www.spike-chunsoft.com/), Emboarger
 - **#0906 Sprigatito** : Emmuffin (https://twitter.com/Ernmuffin), baronessfaron
+- **#0907 Floragato** : ◥θ┴θ◤, Soulja (https://twitter.com/OlSoulja)
+- **#0908 Meowscarada** : LazerBlitz
 - **#0909 Fuecoco** : JFain, G〜 (https://bsky.app/profile/justtr4sh.pmd.social), Caitemis (https://caitemis-art.tumblr.com/)
+- **#0910 Crocalor** : Soulja (https://twitter.com/OlSoulja), pi3.14 (https://twitter.com/Pi_y_ranitas)
+- **#0911 Skeledirge** : Soulja (https://twitter.com/OlSoulja), pi3.14 (https://twitter.com/Pi_y_ranitas)
 - **#0912 Quaxly** : JFain, NickOnimura
+- **#0913 Quaxwell** : Emmuffin (https://twitter.com/Ernmuffin)
+- **#0914 Quaquaval** : Top_Kec

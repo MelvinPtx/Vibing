@@ -6,12 +6,15 @@ from .combat import CombatSystem
 from .entities import Intent, Player, PlayerController, TrainingDummy
 from .items import apply_reward, roll_choices
 from .levels import RoomManager
+from .data.pokedex import POKEMON
+from .progression import xp_reward
 from .species import DUMMY_ROSTER
 from .starters import DEFAULT_STARTER
 from .ui import HUD
 from .ui import theme as T
 from .ui.attack_fx import AttackFX
 from .ui.effects import Effects
+from .ui.evolution import EvolutionScreen
 from .ui.floating_text import FloatingTexts
 from .ui.pause_menu import PauseMenu
 from .ui.reward_menu import RewardMenu
@@ -58,6 +61,7 @@ class Game:
         self.combat = CombatSystem()
         self.menu = None
         self.pause = None
+        self.evolution = None
         self.texts.items.clear()
         self.effects = Effects()
         self.fx = AttackFX()
@@ -101,6 +105,9 @@ class Game:
             if chosen:
                 self.select = None
                 self.reset(chosen)
+        elif self.evolution:                              # évolution en cours : capte tout
+            if self.evolution.handle_event(e):
+                self.finish_evolution()
         elif self.menu:                                   # menu de récompense : capte tout
             chosen = self.menu.handle_event(e)
             if chosen:
@@ -142,12 +149,39 @@ class Game:
             self.draw()
         pygame.quit()
 
+    # --- expérience, niveaux, évolution ---
+    def award_xp(self, enemy) -> None:
+        dex, lv = enemy.species, getattr(enemy, "lv", None)
+        if lv is None or dex not in POKEMON or not self.player.alive:
+            return
+        xp = xp_reward(POKEMON[dex]["base_exp"], lv)
+        res = self.player.gain_xp(xp)
+        if not res.levels:
+            return
+        p = self.player
+        self.texts.add(p.pos - Vector2(0, 80), f"Niv. {res.levels[-1]} !", T.GOLD)
+        for i, (slot, spec) in enumerate(res.new_moves):
+            self.texts.add(p.pos - Vector2(0, 104 + 22 * i), f"{spec.name} appris !", T.YELLOW)
+        self.effects.burst(p.pos, T.GOLD, 20)
+        if res.evolve_to and self.evolution is None:
+            self.evolution = EvolutionScreen(p.form, res.evolve_to)
+
+    def finish_evolution(self) -> None:
+        old = self.player.form
+        self.player.evolve()
+        self.texts.add(self.player.pos - Vector2(0, 80), f"{old.name} → {self.player.name} !", T.GOLD)
+        self.effects.burst(self.player.pos, T.TYPE_COLORS[self.player.types[0].name], 30)
+        self.evolution = None
+
     def pick_reward(self, mod) -> None:
         apply_reward(self.player, mod)
         self.texts.add(self.player.pos - Vector2(0, 40), mod.name, S.YELLOW)
         self.menu = None
 
     def update(self, intent: Intent, dt: float) -> None:
+        if self.evolution:
+            self.evolution.update(dt)
+            return
         if self.select or self.game_over or self.menu or self.pause:
             return
         self.controller.obstacles = self.room.obstacles if self.room else []
@@ -199,6 +233,7 @@ class Game:
                 e.death_fresh = False
                 color = T.TYPE_COLORS[e.types[0].name] if e.types else T.WHITE
                 self.effects.burst(e.pos, color, 46 if getattr(e, "is_boss", False) else 14)
+                self.award_xp(e)
         self.effects.update(dt)
         self.fx.update(dt)
         self.texts.update(dt)
@@ -228,7 +263,9 @@ class Game:
         self.hud.draw_world(self.screen, entities, show_types=self.training)
         self.texts.draw(self.screen)
         room_number = self.room.room_number if self.room else 0
-        if self.menu:
+        if self.evolution:
+            self.evolution.draw(self.screen, self.sprites)
+        elif self.menu:
             self.menu.draw(self.screen)
         elif self.pause:
             self.pause.draw(self.screen, self.player, room_number, self.sprites)
@@ -238,7 +275,7 @@ class Game:
             self.hud.draw(self.screen, self.player, self.clock.get_fps(), room_number,
                           self.room.alive_count if self.room else 0, self.sprites,
                           self.room.boss if self.room else None)
-        if self.banner and not (self.menu or self.pause or self.game_over):
+        if self.banner and not (self.menu or self.pause or self.game_over or self.evolution):
             self.view.draw_banner(self.screen, self.banner[0], self.banner[1],
                                   int(255 * min(1.0, self.banner[2] / 0.5)))
         pygame.display.flip()

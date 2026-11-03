@@ -15,6 +15,7 @@ python -m tests.test_sprites   # tests headless sprites (découpage, animations,
 python -m tests.test_content   # tests headless starters, ennemis, mort, icônes de type
 python -m tests.test_bosses    # tests headless obstacles, navigation, boss
 python -m tests.test_fx        # tests headless animations d'attaque
+python -m tests.test_progression  # tests headless niveaux, évolutions, capacités réelles
 ```
 Au lancement, on choisit son starter (Sprigatito, Fuecoco ou Quaxly). Contrôles : ZQSD / WASD / flèches = bouger · Espace / Maj / clic droit = Dash · clic gauche / E / R = attaques · Échap = menu pause (Reprendre / Statut / Quitter).
 
@@ -28,7 +29,10 @@ Au lancement, on choisit son starter (Sprigatito, Fuecoco ou Quaxly). Contrôles
 - `src/geometry.py` : collisions cercle/rectangle.
 - `src/levels/obstacles.py` : rochers, navigation (BFS) et générateur de dispositions.
 - `src/entities/boss.py` : boss à phases (Onix, Ectoplasma) et zones de danger annoncées.
-- `src/starters.py` : les 3 starters (types, stats, capacités propres) ; STAB x1,5 pour les capacités de son type.
+- `src/starters.py` : les 3 lignées de starters (9 formes) avec leurs vraies capacités ; STAB x1,5 pour les capacités de son type.
+- `src/progression.py` : niveaux, expérience (vraies courbes), mise à l'échelle des stats et des ennemis.
+- `src/data/pokedex.py` : données Pokémon **générées** (`python -m tools.import_pokemon_data`).
+- `src/ui/evolution.py` : écran d'évolution.
 - `src/species.py` : espèces utilisées (n° de Pokédex) : Évoli (joueur), Rattata, mannequins.
 - `src/ui/attack_fx.py` : animations d'attaque dessinées par le code (un style par type).
 - `src/ui/sprites.py` : sprites animés PMD (8 directions, Idle/Walk/Attack/Swing/Shoot/Hurt).
@@ -79,3 +83,23 @@ la mêlée, une onde de choc avec éclats pour les zones, une orbe à traînée 
 et un flash sur la cible touchée (plus gros si super efficace). Chaque type a sa palette et sa forme d'éclat : flammes,
 gouttes, feuilles, éclairs, éclats de glace, bulles, rochers, volutes spectrales, étoiles de fée... Les attaques ennemies
 ont un liseré rouge pour qu'on les repère. Les animations vivent plus longtemps que les hitbox (très brèves).
+
+## Niveaux, évolutions et capacités réelles
+On démarre au niveau 10. Chaque ennemi vaincu rapporte `expérience de base de l'espèce x son niveau / 7` (comme dans les jeux) ;
+les courbes d'expérience sont les vraies (taux de croissance). Les starters **évoluent au niveau 16 puis au niveau 36**
+(Sprigatito → Floragato → Meowscarada, Fuecoco → Crocalor → Skeledirge, Quaxly → Quaxwell → Quaquaval) avec l'écran
+d'évolution des jeux : nouveaux types, sprite, stats (rapport des vraies stats de base) et capacités. Chaque niveau
+donne +2,5 % de stats et +3,5 % de PV ; les ennemis gagnent +10 % de PV par salle.
+
+Les capacités sont de **vraies capacités apprises par chaque forme** dans Écarlate/Violet, débloquées à leur niveau d'apprentissage
+réel (par exemple Canon Graine au niveau 20 pour Floragato), sans aucune capacité partagée entre deux lignées. Type, catégorie,
+puissance, PP et priorité viennent de la base ; le jeu choisit seulement la forme (mêlée, coup large, zone, projectile). Les capacités
+« qui ne ratent jamais » sont à tête chercheuse (Feuille Magik, Magie Florale), Tranch'Aqua et Lame d'Air traversent les ennemis,
+Chant Flamboyant et Danse Aquatique donnent un bonus cumulable (Atq. Spé. / vitesse), Magie Florale est toujours critique.
+
+### Sources de données
+- [pokemondb/database](https://github.com/pokemondb/database) : types, stats de base, taux de croissance, expérience de base et chiffres de chaque capacité.
+  Elle ne contient ni capacités apprises, ni évolutions, ni noms français ; son `pokemon-forms.yaml` est mal formé (ligne 31354), l'outil
+  d'import ne lit donc que les blocs utiles.
+- [PokeAPI/pokeapi](https://github.com/PokeAPI/pokeapi) (CSV) : capacités apprises par niveau dans Écarlate/Violet, noms français, niveaux d'évolution.
+Régénérer : `python -m tools.import_pokemon_data` (réseau + PyYAML) ; le jeu, lui, n'a besoin ni de l'un ni de l'autre.

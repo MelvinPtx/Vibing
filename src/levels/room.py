@@ -8,7 +8,9 @@ from pygame import Vector2
 
 from .. import settings as S
 from ..entities.boss import BOSS_ROTATION
+from ..entities.entity import Stats
 from ..entities.enemy import Fantominus, Racaillou, Rattata, Voltorbe, Zubat
+from ..progression import enemy_hp_mult, enemy_level, enemy_power_mult
 from .obstacles import NavGrid, generate_layout, pick_layout
 
 
@@ -79,8 +81,17 @@ class RoomManager:
                         for cls in self.rng.choices(classes, weights=weights, k=count)]
 
     def _adopt(self, enemy):
-        """Donne à l'ennemi les obstacles et la navigation de la salle."""
+        """Donne à l'ennemi les obstacles et la navigation de la salle, son niveau (qui détermine
+        l'expérience qu'il rapporte) et la difficulté de la salle : PV, dégâts et attaques croissent."""
         enemy.obstacles, enemy.nav = self.obstacles, self.nav
+        r = self.room_number
+        enemy.lv = enemy_level(r, getattr(enemy, "is_boss", False))
+        enemy.max_hp *= enemy_hp_mult(r)
+        enemy.hp = enemy.max_hp
+        power = enemy_power_mult(r)
+        enemy.contact_damage = enemy.contact_damage * power
+        st = enemy.stats
+        enemy.stats = Stats(st.atk * power, st.spa * power, st.defense, st.spdef)
         return enemy
 
     def _spawn_point(self) -> Vector2:

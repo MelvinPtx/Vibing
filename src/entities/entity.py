@@ -51,6 +51,10 @@ class Entity:
         r = int(self.radius)
         return pygame.Rect(self.pos.x - r, self.pos.y - r, r * 2, r * 2)
 
+    def stat(self, name: str) -> float:
+        """Valeur effective d'une stat (atk, spa, defense, spdef) ; le joueur y ajoute ses bonus temporaires."""
+        return getattr(self.stats, name)
+
     def take_damage(self, amount: float) -> bool:
         if amount <= 0:
             return False

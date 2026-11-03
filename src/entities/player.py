@@ -11,6 +11,8 @@ from pygame import Vector2
 
 from .. import settings as S
 from ..geometry import resolve
+from ..data.pokedex import POKEMON
+from ..progression import START_LEVEL, exp_for_level, hp_mult, stat_mult
 from ..starters import DEFAULT_STARTER, Starter
 from .entity import Entity, Stats
 
@@ -23,20 +25,29 @@ class Intent:
     aim: Vector2 | None = None  # point visé (souris) ; None = direction regardée
 
 
-class Player(Entity):
-    """Le Pokémon contrôlé : ses types, stats, PV, vitesse et capacités viennent du `Starter`."""
+@dataclass
+class LevelUp:
+    """Résultat de `Player.gain_xp` : niveaux gagnés, capacités débloquées, évolution due."""
+    levels: list = field(default_factory=list)
+    new_moves: list = field(default_factory=list)       # (emplacement, MoveSpec)
+    evolve_to: "Starter | None" = None
 
-    def __init__(self, pos, starter: Starter = DEFAULT_STARTER):
+
+class Player(Entity):
+    """Le Pokémon contrôlé. Types, stats, PV, vitesse et capacités viennent de sa forme (`Starter`) et de
+    son niveau ; il gagne de l'expérience, monte de niveau et évolue (voir src/progression.py)."""
+
+    BUFF_TIME, BUFF_MAX = 8.0, 3
+
+    def __init__(self, pos, starter: Starter = DEFAULT_STARTER, level: int = START_LEVEL):
         super().__init__(pos, S.PLAYER_RADIUS, S.YELLOW, types=starter.types, max_hp=starter.max_hp)
-        self.starter = starter
-        self.name = starter.name
-        self.species = starter.dex
-        self.stats = Stats(starter.atk, starter.spa, starter.defense, starter.spdef)
-        self.speed_mult = starter.speed_mult
-        self.moveset = dict(starter.moves)            # emplacement -> MoveSpec
+        self.form = starter
+        self.level = level
+        self.growth = POKEMON[starter.dex]["growth"]
+        self.xp = exp_for_level(self.growth, level)
+        self.buffs: dict = {}                         # stat -> [cumuls, temps restant, bonus par cumul]
         self.moving = False
         self.act_anim, self.act_left, self.act_nonce = "Attack", 0.0, 0   # animation d'attaque en cours
-        self.atk_cd = {slot: 0.0 for slot in self.moveset}
         self.modifiers: list = []   # Modifier actifs (src/items)
         self.facing = Vector2(1, 0)
         # État du dash (écrit par le contrôleur, lu par le rendu / le combat)
@@ -45,6 +56,90 @@ class Player(Entity):
         self.hurt_left = 0.0   # invincibilité après avoir été touché
         self.dash_cd_left = 0.0
         self.trail: list[tuple[Vector2, float]] = []  # images rémanentes
+        self.moveset: dict = {}
+        self.atk_cd: dict = {}
+        self._adopt_form(starter)
+        self.hp = self.max_hp
+
+    # --- forme, niveau, évolution ---
+    @property
+    def starter(self) -> Starter:          # forme actuelle (nom historique)
+        return self.form
+
+    def _adopt_form(self, form: Starter) -> None:
+        self.form = form
+        self.name, self.species, self.types = form.name, form.dex, form.types
+        self.recalc()
+        self.refresh_moves()
+
+    def recalc(self) -> None:
+        """Recalcule stats et PV max depuis la forme et le niveau ; les PV gagnés sont ajoutés."""
+        f, sm = self.form, stat_mult(self.level)
+        self.stats = Stats(f.atk * sm, f.spa * sm, f.defense * sm, f.spdef * sm)
+        old = self.max_hp
+        self.max_hp = f.max_hp * hp_mult(self.level)
+        self.hp = min(self.max_hp, self.hp + max(0.0, self.max_hp - old))
+        self.speed_mult = f.speed_mult
+
+    def refresh_moves(self) -> list:
+        """Capacités de l'emplacement à ce niveau ; renvoie celles qui viennent de changer."""
+        new = self.form.moves_at(self.level)
+        changed = [(slot, spec) for slot, spec in new.items() if self.moveset.get(slot) is not spec]
+        self.moveset = new
+        for slot in new:
+            self.atk_cd.setdefault(slot, 0.0)
+        return changed
+
+    @property
+    def xp_into_level(self) -> int:
+        return int(self.xp - exp_for_level(self.growth, self.level))
+
+    @property
+    def xp_span(self) -> int:
+        return exp_for_level(self.growth, self.level + 1) - exp_for_level(self.growth, self.level)
+
+    def gain_xp(self, amount: float) -> LevelUp:
+        res = LevelUp()
+        self.xp += amount
+        while self.level < 100 and self.xp >= exp_for_level(self.growth, self.level + 1):
+            self.level += 1
+            res.levels.append(self.level)
+        if res.levels:
+            self.recalc()
+            res.new_moves = [m for m in self.refresh_moves() if m[1] is not None]
+            self.hp = min(self.max_hp, self.hp + 0.15 * self.max_hp)     # petit soin à chaque montée
+        f = self.form
+        if f.evolves_to and self.level >= f.evolve_level:
+            res.evolve_to = f.evolves_to
+        return res
+
+    def evolve(self) -> list:
+        """Adopte la forme suivante (types, stats, capacités, sprite) et soigne de moitié."""
+        self._adopt_form(self.form.evolves_to)
+        self.hp = min(self.max_hp, self.hp + 0.5 * self.max_hp)
+        return list(self.moveset.items())
+
+    # --- bonus temporaires (Chant Flamboyant, Danse Aquatique...) ---
+    def add_buff(self, stat: str, amount: float) -> None:
+        b = self.buffs.setdefault(stat, [0, 0.0, amount])
+        b[0], b[1] = min(self.BUFF_MAX, b[0] + 1), self.BUFF_TIME
+
+    def tick_buffs(self, dt: float) -> None:
+        for stat in list(self.buffs):
+            self.buffs[stat][1] -= dt
+            if self.buffs[stat][1] <= 0:
+                del self.buffs[stat]
+
+    def _buff_mult(self, stat: str) -> float:
+        b = self.buffs.get(stat)
+        return 1 + b[0] * b[2] if b else 1.0
+
+    def stat(self, name: str) -> float:
+        return getattr(self.stats, name) * self._buff_mult(name)
+
+    @property
+    def move_speed(self) -> float:
+        return self.speed_mult * self._buff_mult("speed")
 
     @property
     def dying(self) -> bool:          # le K.O. du joueur est géré par l'écran de fin
@@ -121,6 +216,7 @@ class PlayerController:
         p.dash_cd_left = max(0.0, p.dash_cd_left - dt)
         p.hurt_left = max(0.0, p.hurt_left - dt)
         p.act_left = max(0.0, p.act_left - dt)
+        p.tick_buffs(dt)
         for mod in p.modifiers:
             mod.on_update(p, dt)
         p.trail = [(pos, life - dt * 5) for pos, life in p.trail if life - dt * 5 > 0]
@@ -148,7 +244,7 @@ class PlayerController:
             if self._dash_time <= 0:
                 p.dashing = False
         else:
-            p.pos += move * S.PLAYER_SPEED * p.speed_mult * dt
+            p.pos += move * S.PLAYER_SPEED * p.move_speed * dt
 
         if self.obstacles:
             resolve(p.pos, p.radius, self.obstacles)
@@ -162,6 +258,8 @@ class PlayerController:
             atk = spec.build(p, Vector2(p.facing))
             atk.slot = intent.attack
             p.act_anim, p.act_left = spec.anim, 0.35
+            if spec.buff:
+                p.add_buff(*spec.buff)
             p.act_nonce += 1
             for mod in p.modifiers:
                 mod.on_attack(atk, p)

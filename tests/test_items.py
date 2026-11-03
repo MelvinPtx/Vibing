@@ -29,7 +29,7 @@ def test_charbon_basic_becomes_fire_and_burns():
         assert a.element is PType.FEU
         cs.spawn(a)
     cs.update(DT, [t])
-    assert t.burn_left > 0 and t.hp == 1000 - 20          # Feu vs Normal : x1
+    assert t.burn_left > 0 and abs(t.hp - (1000 - 18 * 1.10)) < 1e-9   # Griffe 18 x Attaque 1,10 ; Feu vs Normal : x1
     for _ in range(200):
         t.tick_status(DT)
     assert abs(t.hp - (980 - 18)) < 7, t.hp               # ~6 dps x 3 s
@@ -39,7 +39,7 @@ def test_charbon_only_basic_and_fire_types_immune_to_burn():
     p, c = setup()
     apply_reward(p, Charbon())
     special = c.update(Intent(attack="special"), DT)[0]
-    assert special.element is PType.PLANTE
+    assert special.element is PType.TENEBRES              # Morsure : le Charbon ne touche que l'attaque de base
     fire = Entity((540, 500), 20, (0, 0, 0), [PType.FEU], max_hp=1000)
     c2 = CombatSystem()
     p2, ctl = setup()
@@ -61,7 +61,7 @@ def test_modifiers_and_instants():
     p, c = setup()
     apply_reward(p, BandeauChoix()); apply_reward(p, LanceFlammes())
     a = c.update(Intent(attack="special"), DT)[0]
-    assert a.element is PType.FEU and abs(a.power - 35 * 1.3) < 1e-9
+    assert a.element is PType.FEU and abs(a.power - p.moveset["special"].power * 1.3) < 1e-9
     p.hp = 50; apply_reward(p, Restes())
     for _ in range(60):
         c.update(Intent(), DT)

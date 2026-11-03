@@ -220,7 +220,7 @@ class SpriteRenderer:
 
     # --- icônes d'interface (HUD, menus) -------------------------------------------
     def draw_icon(self, surface, dex, center, anim: str = "Idle", direction: int = 0,
-                  scale: int | None = None, shadow: bool = True) -> bool:
+                  scale: int | None = None, shadow: bool = True, tint=None, alpha: int = 255) -> bool:
         sset = self.get(dex)
         if sset is None:
             return False
@@ -230,5 +230,10 @@ class SpriteRenderer:
         if shadow:
             self._shadow(surface, (center[0], center[1] + frame.get_height() // 3),
                          int(frame.get_width() * 0.9), max(6, frame.get_height() // 6))
+        if tint:                                   # ex. (255, 255, 255) : silhouette blanche d'évolution
+            frame = self._tint(frame, tint)
+        if alpha < 255:
+            frame = frame.copy()
+            frame.set_alpha(alpha)
         surface.blit(frame, frame.get_rect(center=center))
         return True

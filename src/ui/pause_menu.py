@@ -131,8 +131,7 @@ class PauseMenu:
             pygame.draw.line(surface, (255, 255, 255), c, (c[0] + 84, c[1]), 6)
         T.alpha_rect(surface, (pr.x, pr.bottom - 64, pr.w, 64), T.NAVY_DARK, 235, 12)
         T.text(surface, player.name, 24, T.WHITE, midleft=(pr.x + 18, pr.bottom - 32))
-        T.lv_pill(surface, f"Salle {room_number}" if room_number else "Entraînement",
-                  midright=(pr.right - 16, pr.bottom - 32))
+        T.lv_pill(surface, f"Niv. {player.level}", midright=(pr.right - 16, pr.bottom - 32))
 
         # fiche
         x, vx, y = 376, 556, 126
@@ -146,24 +145,39 @@ class PauseMenu:
         T.hp_bar(surface, (vx, y + 90, 300, 30), player.hp / player.max_hp,
                  f"{player.hp:.0f}/{player.max_hp:.0f}")
 
-        T.text(surface, "Capacités", 20, T.LABEL, topleft=(x, y + 146))
-        for i, (name, ptype, power, cat, key) in enumerate(move_infos(player)):
-            rr = pygame.Rect(vx, y + 136 + i * 58, 424, 52)
-            T.alpha_rect(surface, rr, T.NAVY_ROW, 200, 9)
-            T.draw_type_icon(surface, ptype, (rr.x + 26, rr.centery), 38)
-            T.text(surface, name, 20, T.WHITE, topleft=(rr.x + 58, rr.y + 6))
-            T.text(surface, f"[{key}]  {cat} · puissance {power:.0f}", 13, T.GREY, False,
-                   topleft=(rr.x + 58, rr.y + 30))
-            T.type_pill(surface, ptype, 26, midright=(rr.right - 12, rr.centery))
+        T.text(surface, "Niveau", 20, T.LABEL, topleft=(x, y + 140))
+        T.text(surface, f"{player.level}", 20, T.WHITE, topleft=(vx, y + 140))
+        T.thin_bar(surface, (vx + 56, y + 148, 240, 10), player.xp_into_level / max(1, player.xp_span), T.CYAN)
+        T.text(surface, f"{player.xp_into_level}/{player.xp_span} EXP", 13, T.GREY, False, topleft=(vx + 306, y + 143))
 
-        T.text(surface, "Objets", 20, T.LABEL, topleft=(x, y + 330))
+        T.text(surface, "Capacités", 20, T.LABEL, topleft=(x, y + 186))
+        for i, (name, ptype, power, cat, key) in enumerate(move_infos(player)):
+            rr = pygame.Rect(vx, y + 178 + i * 54, 424, 48)
+            T.alpha_rect(surface, rr, T.NAVY_ROW, 200, 9)
+            T.draw_type_icon(surface, ptype, (rr.x + 24, rr.centery), 34)
+            T.text(surface, name, 19, T.WHITE, topleft=(rr.x + 52, rr.y + 5))
+            T.text(surface, f"[{key}]  {cat} · puissance {power:.0f}", 13, T.GREY, False,
+                   topleft=(rr.x + 52, rr.y + 28))
+            T.type_pill(surface, ptype, 24, midright=(rr.right - 12, rr.centery))
+
+        form = player.form
+        T.text(surface, "Objets", 20, T.LABEL, topleft=(x, y + 346))
         if player.modifiers:
-            px, py = vx, y + 326
+            px, py = vx, y + 342
             for m in player.modifiers:
                 rect = T.pill(surface, m.name, 16, T.KIND_COLORS[m.kind.name], T.WHITE,
                               pad=(14, 6), topleft=(px, py))
                 px = rect.right + 8
         else:
-            T.text(surface, "Aucun", 20, T.GREY, False, topleft=(vx, y + 330))
+            T.text(surface, "Aucun", 20, T.GREY, False, topleft=(vx, y + 346))
+        T.text(surface, "Évolution", 20, T.LABEL, topleft=(x, y + 392))
+        if form.evolves_to:
+            T.text(surface, f"{form.evolves_to.name} au niveau {form.evolve_level}", 20, T.WHITE, topleft=(vx, y + 392))
+        else:
+            T.text(surface, "Forme finale", 20, T.GREY, False, topleft=(vx, y + 392))
+        nxt = form.next_unlock(player.level)
+        T.text(surface, "Prochaine", 20, T.LABEL, topleft=(x, y + 432))
+        T.text(surface, f"{nxt[1].name} au niveau {nxt[0]}" if nxt else "—", 20, T.WHITE if nxt else T.GREY,
+               topleft=(vx, y + 432))
 
         T.footer(surface, [("Échap", "Retour")], T.ORANGE, T.ORANGE_PAT)

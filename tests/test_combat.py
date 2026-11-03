@@ -44,8 +44,8 @@ def test_tranch_herbe_is_physical_and_uses_the_attack_stat():
     atk = tranch_herbe(Player((0, 0), SPRIGATITO), Vector2(1, 0))
     assert atk.category is Category.PHYSICAL
     water = Entity((50, 0), 20, (0, 0, 0), [P.EAU], max_hp=1000)
-    # 35 x Atq 1,0 (et non Atq. Spé. 1,1) x 2 (Plante > Eau) x 1,5 (STAB)
-    assert abs(compute_damage(atk, water).amount - 35 * 1.0 * 2 * 1.5) < 1e-9
+    # 35 x Attaque 1,10 (rééquilibrage de Sprigatito ; et non l'Atq. Spé. 1,00) x 2 (Plante > Eau) x 1,5 (STAB)
+    assert abs(compute_damage(atk, water).amount - 35 * 1.10 * 2 * 1.5) < 1e-9
 
 
 def test_system_hits_once_and_projectile_dies():
@@ -55,7 +55,7 @@ def test_system_hits_once_and_projectile_dies():
     cs.spawn(balle_ombre(me, Vector2(1, 0)))
     for _ in range(60):
         cs.update(1 / 60, [t])
-    assert abs(t.hp - (1000 - 25 * 1.1 * 2)) < 1e-9 and not cs.attacks  # Spectre > Psy x2, Atq. Spé. 1,1 ; un seul impact
+    assert abs(t.hp - (1000 - 25 * 1.0 * 2)) < 1e-9 and not cs.attacks  # Spectre > Psy x2, Atq. Spé. 1,00 ; un seul impact
 
 
 def test_player_spawns_attack_with_cooldown():

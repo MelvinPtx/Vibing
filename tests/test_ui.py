@@ -66,7 +66,7 @@ def test_status_shows_modified_moves():
     g = Game(starter=DEFAULT_STARTER)
     apply_reward(g.player, Charbon())
     names = {n: e.value for n, e, *_ in move_infos(g.player)}
-    assert names["Vive-Attaque"] == "Feu" and names["Tranch'Herbe"] == "Plante"
+    assert names["Griffe"] == "Feu" and names["Morsure"] == "Ténèbres"
 
 
 def test_every_screen_renders():

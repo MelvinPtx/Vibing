@@ -9,8 +9,8 @@ from .reward_menu import wrap
 
 LIST_X, LIST_Y, ROW_W, ROW_H, ROW_GAP = 70, 116, 400, 104, 14
 DETAIL = pygame.Rect(520, 80, 466, 570)
-STAT_ROWS = (("PV", "max_hp", 140, "{:.0f}"), ("Attaque", "atk", 1.2, "{:.0f}%"),
-             ("Atq. Spé.", "spa", 1.2, "{:.0f}%"), ("Vitesse", "speed_mult", 1.15, "{:.0f}%"))
+STAT_ROWS = (("PV", "max_hp", 140, "{:.0f}"), ("Attaque", "atk", 1.3, "{:.0f}%"),
+             ("Atq. Spé.", "spa", 1.3, "{:.0f}%"), ("Vitesse", "speed_mult", 1.15, "{:.0f}%"))
 SLOT_KEYS = (("basic", "Clic G"), ("special", "E"), ("cast", "R"))
 KIND_LABEL = {"melee": "Mêlée", "burst": "Zone", "projectile": "Projectile"}
 
@@ -69,37 +69,49 @@ class StarterSelect:
     def _draw_detail(self, surface, st, sprites) -> None:
         d = DETAIL
         T.alpha_rect(surface, d, T.NAVY, 185, 16)
-        # portrait animé
-        if sprites:
-            sprites.draw_icon(surface, st.dex, (d.centerx, d.y + 112), "Idle", 0, 5)
-        # nom, types, description
-        y = d.y + 206
+        if sprites:                                              # portrait animé
+            sprites.draw_icon(surface, st.dex, (d.centerx, d.y + 74), "Idle", 0, 3)
+        y = d.y + 134                                            # nom, types, description
         T.detail_title(surface, st.name, d.x + 22, y, 26)
         x = d.right - 22
         for t in reversed(st.types):
             x = T.type_pill(surface, t, 28, topright=(x, y + 2)).left - 8
-        ty = y + 44
-        for line in wrap(T.font(16, False), st.description, d.w - 44):
-            T.text(surface, line, 16, T.WHITE, False, topleft=(d.x + 22, ty))
-            ty += 22
+        ty = y + 40
+        for line in wrap(T.font(15, False), st.description, d.w - 44):
+            T.text(surface, line, 15, T.WHITE, False, topleft=(d.x + 22, ty))
+            ty += 20
+        # lignée d'évolution : formes 2 et 3 avec leur niveau
+        ey = d.y + 238
+        T.text(surface, "Évolutions", 16, T.LABEL, topleft=(d.x + 22, ey + 22))
+        ex = d.x + 140
+        form = st
+        while form.evolves_to:
+            T.text(surface, f"niv. {form.evolve_level} →", 13, T.GREY, midleft=(ex, ey + 32))
+            ex += 70
+            nxt = form.evolves_to
+            if sprites:
+                sprites.draw_icon(surface, nxt.dex, (ex + 24, ey + 30), "Idle", 0, 2, shadow=False)
+            T.text(surface, nxt.name, 12, T.WHITE, midtop=(ex + 24, ey + 64))
+            ex += 78
+            form = nxt
         # stats
-        sy = d.y + 300
+        sy = d.y + 326
         for label, attr, top, fmt in STAT_ROWS:
             v = getattr(st, attr)
-            T.text(surface, label, 17, T.LABEL, topleft=(d.x + 22, sy))
+            T.text(surface, label, 16, T.LABEL, topleft=(d.x + 22, sy))
             T.thin_bar(surface, (d.x + 140, sy + 6, 230, 10), v / top, T.LIME)
             shown = fmt.format(v * 100 if "%" in fmt else v)
-            T.text(surface, shown, 17, T.WHITE, topright=(d.right - 22, sy))
-            sy += 27
-        # capacités
-        T.text(surface, "Capacités", 17, T.LABEL, topleft=(d.x + 22, d.y + 416))
-        my = d.y + 440
+            T.text(surface, shown, 16, T.WHITE, topright=(d.right - 22, sy))
+            sy += 23
+        # capacités de départ
+        T.text(surface, "Capacités", 16, T.LABEL, topleft=(d.x + 22, d.y + 428))
+        my = d.y + 450
         for slot, key in SLOT_KEYS:
             m = st.moves[slot]
-            rr = pygame.Rect(d.x + 16, my, d.w - 32, 38)
+            rr = pygame.Rect(d.x + 16, my, d.w - 32, 34)
             T.alpha_rect(surface, rr, T.NAVY_ROW, 200, 9)
-            T.draw_type_icon(surface, m.element, (rr.x + 22, rr.centery), 30)
-            T.text(surface, m.name, 18, T.WHITE, midleft=(rr.x + 48, rr.centery))
+            T.draw_type_icon(surface, m.element, (rr.x + 20, rr.centery), 26)
+            T.text(surface, m.name, 17, T.WHITE, midleft=(rr.x + 42, rr.centery))
             T.text(surface, f"[{key}] {KIND_LABEL[m.kind]} · {m.category.value} · {m.power:.0f}",
-                   13, T.GREY, False, midright=(rr.right - 12, rr.centery))
-            my += 42
+                   12, T.GREY, False, midright=(rr.right - 12, rr.centery))
+            my += 37
