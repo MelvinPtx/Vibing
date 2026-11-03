@@ -28,3 +28,11 @@ DASH_COOLDOWN = 0.60          # s : mesuré depuis le début du dash
 
 # Arène (rectangle jouable)
 ARENA_MARGIN = 60
+
+# Joueur touché : courte invincibilité pour ne pas se faire enchaîner
+HIT_IFRAMES = 0.6
+
+# Salles
+DOOR_W, DOOR_H = 90, 44
+SPAWN_DELAY = 0.8           # s : télégraphie d'apparition (ennemi inoffensif et intouchable)
+MIN_SPAWN_DIST = 260        # px minimum entre un spawn et le joueur

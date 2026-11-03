@@ -32,25 +32,29 @@ class Player(Entity):
         # État du dash (écrit par le contrôleur, lu par le rendu / le combat)
         self.dashing = False
         self.iframes_left = 0.0
+        self.hurt_left = 0.0   # invincibilité après avoir été touché
         self.dash_cd_left = 0.0
         self.trail: list[tuple[Vector2, float]] = []  # images rémanentes
 
     @property
     def invincible(self) -> bool:
         """À consulter par le système de dégâts (phase 2+)."""
-        return self.iframes_left > 0
+        return self.iframes_left > 0 or self.hurt_left > 0
 
     def take_damage(self, amount: float) -> bool:
         if self.invincible:
             return False
-        return super().take_damage(amount)
+        hit = super().take_damage(amount)
+        if hit:
+            self.hurt_left = S.HIT_IFRAMES
+        return hit
 
     def draw(self, surface: pygame.Surface) -> None:
         for p, life in self.trail:
             s = pygame.Surface((self.radius * 2,) * 2, pygame.SRCALPHA)
             pygame.draw.circle(s, (*S.CYAN, int(120 * life)), (self.radius,) * 2, self.radius)
             surface.blit(s, p - Vector2(self.radius, self.radius))
-        color = S.CYAN if self.invincible else self.color
+        color = S.RED if self.hurt_left > 0 else (S.CYAN if self.invincible else self.color)
         pygame.draw.circle(surface, color, self.pos, self.radius)
         pygame.draw.circle(surface, S.WHITE, self.pos, self.radius, 2)
         # indicateur de direction
@@ -73,6 +77,7 @@ class PlayerController:
         # Timers
         p.iframes_left = max(0.0, p.iframes_left - dt)
         p.dash_cd_left = max(0.0, p.dash_cd_left - dt)
+        p.hurt_left = max(0.0, p.hurt_left - dt)
         p.trail = [(pos, life - dt * 5) for pos, life in p.trail if life - dt * 5 > 0]
 
         move = Vector2(intent.move)

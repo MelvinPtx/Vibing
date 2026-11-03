@@ -3,9 +3,11 @@
 ## Lancer
 ```
 pip install -r requirements.txt
-python main.py
+python main.py                 # partie : salles + Rattata
+python main.py --training      # mannequins d'entraînement (phase 2)
 python -m tests.test_dash      # tests headless du déplacement / dash
 python -m tests.test_combat    # tests headless table des types / dégâts
+python -m tests.test_rooms     # tests headless ennemis / salles / portes
 ```
 Contrôles : ZQSD / WASD / flèches = bouger · Espace / Maj / clic droit = Dash · Échap = quitter.
 
