@@ -5,6 +5,7 @@
 pip install -r requirements.txt
 python main.py
 python -m tests.test_dash      # tests headless du déplacement / dash
+python -m tests.test_combat    # tests headless table des types / dégâts
 ```
 Contrôles : ZQSD / WASD / flèches = bouger · Espace / Maj / clic droit = Dash · Échap = quitter.
 

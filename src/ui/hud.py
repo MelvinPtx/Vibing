@@ -21,9 +21,11 @@ class DebugHUD:
                   "DASH PRÊT" if ready >= 1 else f"DASH {player.dash_cd_left:.2f}s")
         self._bar(surface, 16, 38, 160, 14, player.iframes_left / S.DASH_IFRAMES, S.YELLOW,
                   f"I-FRAMES {player.iframes_left:.2f}s")
-        lines = [f"FPS {fps:4.0f}", "ZQSD/WASD/flèches : bouger", "ESPACE/MAJ/clic droit : dash", "ÉCHAP : quitter"]
+        lines = [f"FPS {fps:4.0f}", "ZQSD/WASD/flèches : bouger", "ESPACE/MAJ/clic droit : dash",
+                 "clic gauche : Vive-Attaque (Normal)", "E : Tranch'Herbe (Plante)",
+                 "R : Ball'Ombre (Spectre)", "ÉCHAP : quitter"]
         for i, t in enumerate(lines):
-            surface.blit(self.font.render(t, True, S.GREY), (16, S.SCREEN_H - 90 + i * 20))
+            surface.blit(self.font.render(t, True, S.GREY), (16, S.SCREEN_H - 20 * len(lines) - 4 + i * 20))
 
 
 GREY_ORANGE = (200, 130, 60)

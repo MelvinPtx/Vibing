@@ -10,6 +10,8 @@ import pygame
 from pygame import Vector2
 
 from .. import settings as S
+from ..combat.moves import COOLDOWNS, MOVES
+from ..combat.types import PType
 from .entity import Entity
 
 
@@ -17,13 +19,15 @@ from .entity import Entity
 class Intent:
     move: Vector2 = field(default_factory=Vector2)
     dash: bool = False
+    attack: str | None = None   # "basic" | "special" | "cast"
+    aim: Vector2 | None = None  # point visé (souris) ; None = direction regardée
 
 
 class Player(Entity):
     def __init__(self, pos):
-        super().__init__(pos, S.PLAYER_RADIUS, S.YELLOW)
-        self.hp = S.PLAYER_MAX_HP
-        self.max_hp = S.PLAYER_MAX_HP
+        super().__init__(pos, S.PLAYER_RADIUS, S.YELLOW, types=(PType.NORMAL,),
+                         max_hp=S.PLAYER_MAX_HP)
+        self.atk_cd = {k: 0.0 for k in COOLDOWNS}
         self.facing = Vector2(1, 0)
         # État du dash (écrit par le contrôleur, lu par le rendu / le combat)
         self.dashing = False
@@ -39,8 +43,7 @@ class Player(Entity):
     def take_damage(self, amount: float) -> bool:
         if self.invincible:
             return False
-        self.hp = max(0, self.hp - amount)
-        return True
+        return super().take_damage(amount)
 
     def draw(self, surface: pygame.Surface) -> None:
         for p, life in self.trail:
@@ -61,8 +64,11 @@ class PlayerController:
         self._dash_time = 0.0
         self._dash_dir = Vector2(1, 0)
 
-    def update(self, intent: Intent, dt: float) -> None:
+    def update(self, intent: Intent, dt: float) -> list:
+        """Avance d'une frame. Renvoie la liste des Attack créées (à confier au CombatSystem)."""
         p = self.player
+        for k in p.atk_cd:
+            p.atk_cd[k] = max(0.0, p.atk_cd[k] - dt)
 
         # Timers
         p.iframes_left = max(0.0, p.iframes_left - dt)
@@ -94,6 +100,14 @@ class PlayerController:
             p.pos += move * S.PLAYER_SPEED * dt
 
         self._clamp(p)
+
+        spawned = []
+        if intent.attack in MOVES and p.atk_cd[intent.attack] <= 0 and not p.dashing:
+            if intent.aim is not None and (intent.aim - p.pos).length_squared() > 1:
+                p.facing = (intent.aim - p.pos).normalize()
+            spawned.append(MOVES[intent.attack](p, Vector2(p.facing)))
+            p.atk_cd[intent.attack] = COOLDOWNS[intent.attack]
+        return spawned
 
     def _clamp(self, p: Player) -> None:
         b, r = self.bounds, p.radius
