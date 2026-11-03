@@ -107,6 +107,29 @@ def test_nav_finds_way_around_a_cup_and_ground_enemy_follows_it():
     assert trapped_chase(False) > 150                      # sans navigation il reste coincé
 
 
+def test_nav_cells_are_all_physically_reachable_and_the_edge_corridor_bug_is_gone():
+    """Régression : le chemin passait par une colonne de cases dont le centre (x = 68) était hors d'atteinte du joueur
+    (rayon 20 contre le mur de l'arène à x = 60), qui poussait indéfiniment contre le bord."""
+    rocks = [pygame.Rect(110, 270, 485, 38), pygame.Rect(735, 270, 179, 38), pygame.Rect(110, 400, 74, 38), pygame.Rect(324, 400, 590, 38)]
+    nav = NavGrid(ROOM, rocks)
+    reach = ROOM.inflate(-40, -40)                                  # là où le centre d'un personnage de rayon 20 peut aller
+    for c in range(nav.cols):
+        for r in range(nav.rows):
+            if not nav.blocked[c][r]:
+                assert reach.collidepoint(nav.center(c, r)), (c, r, nav.center(c, r))
+    pos, door = Vector2(80, 340), Vector2(352, 60)
+    for _ in range(600):                                            # suit le chemin comme le joueur : déplacement borné par l'arène
+        nav.update_target(door)
+        step = nav.next_point(pos, door) - pos
+        if step.length() < 1:
+            break
+        pos += step.normalize() * min(step.length(), 6)
+        pos.x, pos.y = min(max(pos.x, reach.left), reach.right), min(max(pos.y, reach.top), reach.bottom)
+        if pos.distance_to(door) < 45:
+            break
+    assert pos.distance_to(door) < 45, pos
+
+
 def test_flying_enemy_ignores_rocks():
     wall = [pygame.Rect(60, 300, 904, 40)]
     z = Zubat((500, 200)); z.spawn_left = 0

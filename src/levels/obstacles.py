@@ -25,7 +25,8 @@ WALL_MARGIN = 50       # écart minimal avec les murs de l'arène
 
 # --- navigation -----------------------------------------------------------------
 class NavGrid:
-    """Grille de 16 px ; les cellules proches d'un obstacle sont bloquées. `update_target`
+    """Grille de 16 px ; les cellules proches d'un obstacle ou d'un mur de l'arène sont bloquées (il faut pouvoir
+    y placer le centre du personnage). `update_target`
     calcule les distances (BFS) jusqu'à la cellule de la cible ; `next_point` donne la prochaine
     cellule à viser pour s'en approcher."""
 
@@ -36,8 +37,12 @@ class NavGrid:
         self.margin = margin
         self.cols, self.rows = math.ceil(arena.w / cell), math.ceil(arena.h / cell)
         grown = [o.inflate(2 * margin, 2 * margin) for o in self.obstacles]
-        self.blocked = [[any(pygame.Rect(arena.x + c * cell, arena.y + r * cell, cell, cell).colliderect(g)
-                             for g in grown) for r in range(self.rows)] for c in range(self.cols)]
+        inner = arena.inflate(-2 * margin, -2 * margin)       # centres atteignables : une marge reste le long des murs de l'arène
+
+        def blocked(c: int, r: int) -> bool:
+            cell_rect = pygame.Rect(arena.x + c * cell, arena.y + r * cell, cell, cell)
+            return not inner.contains(cell_rect) or any(cell_rect.colliderect(g) for g in grown)
+        self.blocked = [[blocked(c, r) for r in range(self.rows)] for c in range(self.cols)]
         self.dist = None
         self._grown = grown
 
