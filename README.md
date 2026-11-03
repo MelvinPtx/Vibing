@@ -5,6 +5,7 @@
 pip install -r requirements.txt
 python main.py                 # partie : salles + Rattata
 python main.py --training      # mannequins d'entraînement (phase 2)
+python main.py --room 5        # démarre directement à la salle 5 (premier boss)
 python -m tests.test_dash      # tests headless du déplacement / dash
 python -m tests.test_combat    # tests headless table des types / dégâts
 python -m tests.test_rooms     # tests headless ennemis / salles / portes
@@ -12,6 +13,7 @@ python -m tests.test_items     # tests headless modificateurs / récompenses
 python -m tests.test_ui        # tests headless menus (navigation, pause, rendu)
 python -m tests.test_sprites   # tests headless sprites (découpage, animations, crédits)
 python -m tests.test_content   # tests headless starters, ennemis, mort, icônes de type
+python -m tests.test_bosses    # tests headless obstacles, navigation, boss
 ```
 Au lancement, on choisit son starter (Sprigatito, Fuecoco ou Quaxly). Contrôles : ZQSD / WASD / flèches = bouger · Espace / Maj / clic droit = Dash · clic gauche / E / R = attaques · Échap = menu pause (Reprendre / Statut / Quitter).
 
@@ -22,6 +24,9 @@ Au lancement, on choisit son starter (Sprigatito, Fuecoco ou Quaxly). Contrôles
 - `src/combat/` : (phase 2) types, attaques, dégâts.
 - `src/levels/` : (phase 3) salles, RoomManager.
 - `src/items/` : modificateurs passifs (`on_attack` / `on_update` / `on_pickup`) et catalogue de récompenses.
+- `src/geometry.py` : collisions cercle/rectangle.
+- `src/levels/obstacles.py` : rochers, navigation (BFS) et générateur de dispositions.
+- `src/entities/boss.py` : boss à phases (Onix, Ectoplasma) et zones de danger annoncées.
 - `src/starters.py` : les 3 starters (types, stats, capacités propres) ; STAB x1,5 pour les capacités de son type.
 - `src/species.py` : espèces utilisées (n° de Pokédex) : Évoli (joueur), Rattata, mannequins.
 - `src/ui/sprites.py` : sprites animés PMD (8 directions, Idle/Walk/Attack/Swing/Shoot/Hurt).
@@ -49,3 +54,19 @@ Ils apparaissent progressivement selon le numéro de salle (`ENEMY_TABLE` dans `
 `assets/icons/types/` : 18 icônes rondes (128 px), découpées depuis une planche fournie pour le projet
 (auteur d'origine non renseigné ; usage non commercial, prototype de fan). Elles servent dans les pastilles de
 type, le HUD, l'écran de choix du starter et le statut.
+
+## Salles à obstacles
+Dès la salle 2, la salle reçoit une disposition aléatoire : piliers, rochers, murs à passages, gros blocs (`LAYOUTS`).
+Chaque disposition est validée : zone des portes et point d'arrivée dégagés, tout le sol atteignable.
+Les rochers bloquent le joueur (dash compris), les ennemis terrestres et **tous les projectiles** (ils servent d'abris
+contre Fantominus ou les boss) ; Zubat et Fantominus volent au-dessus. Les ennemis terrestres contournent les murs
+(navigation par BFS depuis le joueur, recalculée 5 fois par seconde).
+
+## Boss
+Une salle de boss toutes les 5 salles (`BOSS_EVERY`), les boss alternent et gagnent 60 % de PV à chaque cycle.
+Chacun a 3 phases (à 60 % et 30 % de PV) et ses attaques sont **annoncées au sol** en rouge avant de frapper :
+- **Onix** (Roche/Sol, Déf x2,2) : Jets de pierres, Séisme (grande zone, à fuir ou à traverser en dash), Charge en
+  ligne droite, Éboulements ; invoque des Racaillou.
+- **Ectoplasma** (Spectre/Poison, vole) : volées et anneau de Ball'Ombre, téléportation + Poing Ombre, bombes
+  toxiques ; invoque des Fantominus. Normal est sans effet sur lui.
+Vaincre un boss rend la moitié des PV.

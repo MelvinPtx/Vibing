@@ -10,6 +10,7 @@ import pygame
 from pygame import Vector2
 
 from .. import settings as S
+from ..geometry import resolve
 from ..starters import DEFAULT_STARTER, Starter
 from .entity import Entity, Stats
 
@@ -105,6 +106,7 @@ class PlayerController:
     def __init__(self, player: Player, bounds: pygame.Rect):
         self.player = player
         self.bounds = bounds
+        self.obstacles: list = []        # rochers de la salle courante (fournis par le jeu)
         self._dash_time = 0.0
         self._dash_dir = Vector2(1, 0)
 
@@ -148,6 +150,8 @@ class PlayerController:
         else:
             p.pos += move * S.PLAYER_SPEED * p.speed_mult * dt
 
+        if self.obstacles:
+            resolve(p.pos, p.radius, self.obstacles)
         self._clamp(p)
 
         spawned = []

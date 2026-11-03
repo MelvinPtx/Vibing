@@ -9,6 +9,8 @@ Sprites issus de [PMDCollab/SpriteCollab](https://github.com/PMDCollab/SpriteCol
 - **#0046 Paras** : CHUNSOFT (https://www.spike-chunsoft.com/)
 - **#0074 Racaillou** : CHUNSOFT (https://www.spike-chunsoft.com/)
 - **#0092 Fantominus** : CHUNSOFT (https://www.spike-chunsoft.com/)
+- **#0094 Ectoplasma** : CHUNSOFT (https://www.spike-chunsoft.com/), Emboarger
+- **#0095 Onix** : CHUNSOFT (https://www.spike-chunsoft.com/)
 - **#0100 Voltorbe** : CHUNSOFT (https://www.spike-chunsoft.com/), Emboarger
 - **#0143 Ronflex** : CHUNSOFT (https://www.spike-chunsoft.com/)
 - **#0152 Germignon** : CHUNSOFT (https://www.spike-chunsoft.com/)

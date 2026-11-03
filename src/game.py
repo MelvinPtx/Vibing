@@ -29,7 +29,7 @@ ATTACK_KEYS = {pygame.K_e: "special", pygame.K_r: "cast", pygame.K_j: "basic"}
 
 
 class Game:
-    def __init__(self, training: bool = False, starter=None):
+    def __init__(self, training: bool = False, starter=None, room: int = 1):
         """`starter` : démarre directement avec ce Pokémon ; sinon l'écran de choix s'affiche."""
         pygame.init()
         self.screen = pygame.display.set_mode((S.SCREEN_W, S.SCREEN_H))
@@ -38,6 +38,8 @@ class Game:
         self.arena = pygame.Rect(S.ARENA_MARGIN, S.ARENA_MARGIN,
                                  S.SCREEN_W - 2 * S.ARENA_MARGIN, S.SCREEN_H - 2 * S.ARENA_MARGIN)
         self.training = training
+        self.first_room = room             # numéro de la première salle (--room N pour tester un boss)
+        self.banner = None                 # [texte, sous-titre, secondes restantes]
         self.hud = HUD()
         self.view = RoomView()
         self.sprites = SpriteRenderer()
@@ -64,7 +66,13 @@ class Game:
                             for i, (name, dex, types) in enumerate(DUMMY_ROSTER)]
         else:
             self.dummies = []
-            self.room = RoomManager(self.arena, self.player)
+            self.room = RoomManager(self.arena, self.player, start_number=self.first_room)
+            self._announce_boss()
+
+    def _announce_boss(self) -> None:
+        boss = self.room.boss if self.room else None
+        if boss is not None:
+            self.banner = [f"{boss.name} sauvage !", "Boss — Phase 1", 2.4]
 
     @property
     def game_over(self) -> bool:
@@ -139,6 +147,7 @@ class Game:
     def update(self, intent: Intent, dt: float) -> None:
         if self.select or self.game_over or self.menu or self.pause:
             return
+        self.controller.obstacles = self.room.obstacles if self.room else []
         for atk in self.controller.update(intent, dt):
             self.combat.spawn(atk)
         if self.room:
@@ -146,6 +155,7 @@ class Game:
             if reward:
                 self.combat.clear()
                 self.menu = RewardMenu(roll_choices(reward, self.player))
+                self._announce_boss()
                 return
             targets = self.room.targets
             for atk in self.room.drain_attacks():           # tirs et explosions ennemis
@@ -154,7 +164,19 @@ class Game:
             for d in self.dummies:
                 d.update(dt)
             targets = self.dummies
-        self.combat.update(dt, targets, self.player)
+        self.combat.update(dt, targets, self.player, self.room.obstacles if self.room else ())
+        boss = self.room.boss if self.room else None
+        if boss is not None:
+            for ev in boss.events:                          # « Phase 2 ! »
+                self.texts.add(boss.pos - Vector2(0, boss.radius + 70), ev, T.YELLOW)
+            boss.events.clear()
+        if self.room and self.room.consume_boss_clear():    # boss vaincu : soin de moitié
+            self.player.hp = min(self.player.max_hp, self.player.hp + self.player.max_hp / 2)
+            self.texts.add(self.player.pos - Vector2(0, 60), "Boss vaincu ! PV restaurés", T.YELLOW)
+        if self.banner:
+            self.banner[2] -= dt
+            if self.banner[2] <= 0:
+                self.banner = None
         for target, res, atk in self.combat.events:
             color = S.RED if res.multiplier > 1 else (S.GREY if res.multiplier < 1 else S.WHITE)
             self.texts.add(target.pos - Vector2(0, 50), f"{res.amount:.0f}", color)
@@ -168,7 +190,7 @@ class Game:
             if e.death_fresh:
                 e.death_fresh = False
                 color = T.TYPE_COLORS[e.types[0].name] if e.types else T.WHITE
-                self.effects.burst(e.pos, color)
+                self.effects.burst(e.pos, color, 46 if getattr(e, "is_boss", False) else 14)
         self.effects.update(dt)
         self.texts.update(dt)
         self.sprites.update(dt)
@@ -184,6 +206,8 @@ class Game:
         else:
             pygame.draw.rect(self.screen, S.FLOOR, self.arena)
             pygame.draw.rect(self.screen, S.WALL, self.arena, 6)
+        if self.room:
+            self.view.draw_telegraphs(self.screen, self.room.telegraphs)
         entities = self.room.enemies if self.room else self.dummies
         for e in sorted([*entities, self.player], key=lambda e: e.pos.y):   # profondeur : le plus bas devant
             if self.sprites.draw(self.screen, e):
@@ -208,5 +232,9 @@ class Game:
             self.view.draw_game_over(self.screen, self.player, room_number)
         else:
             self.hud.draw(self.screen, self.player, self.clock.get_fps(), room_number,
-                          self.room.alive_count if self.room else 0, self.sprites)
+                          self.room.alive_count if self.room else 0, self.sprites,
+                          self.room.boss if self.room else None)
+        if self.banner and not (self.menu or self.pause or self.game_over):
+            self.view.draw_banner(self.screen, self.banner[0], self.banner[1],
+                                  int(255 * min(1.0, self.banner[2] / 0.5)))
         pygame.display.flip()

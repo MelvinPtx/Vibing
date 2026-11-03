@@ -4,6 +4,7 @@ from .combat.types import PType
 from .starters import STARTERS
 
 RATTATA_DEX, ZUBAT_DEX, GEODUDE_DEX, GASTLY_DEX, VOLTORB_DEX = 19, 41, 74, 92, 100
+GENGAR_DEX, ONIX_DEX = 94, 95    # boss
 
 # Mannequins d'entraînement : un vrai Pokémon par cas de test de la table des types.
 # (nom, n° Pokédex, types)
@@ -19,7 +20,7 @@ DUMMY_ROSTER = [
 NAMES = {
     **{s.dex: s.name for s in STARTERS},
     RATTATA_DEX: "Rattata", ZUBAT_DEX: "Zubat", GEODUDE_DEX: "Racaillou",
-    GASTLY_DEX: "Fantominus", VOLTORB_DEX: "Voltorbe",
+    GASTLY_DEX: "Fantominus", VOLTORB_DEX: "Voltorbe", GENGAR_DEX: "Ectoplasma", ONIX_DEX: "Onix",
     **{d: n for n, d, _ in DUMMY_ROSTER},
 }
 ALL_DEX = sorted(NAMES)

@@ -1,4 +1,5 @@
 from .attack import Attack
+from ..geometry import circle_hits_rect
 from .damage import compute_damage
 
 
@@ -24,7 +25,12 @@ class CombatSystem:
         self.attacks.clear()
         self.hostile.clear()
 
-    def update(self, dt: float, targets, player=None) -> None:
+    @staticmethod
+    def _blocked(atk: Attack, obstacles) -> bool:
+        """Un projectile (non perforant) s'arrête contre un rocher ; mêlée et zones passent."""
+        return not atk.pierce and any(circle_hits_rect(atk.pos, atk.radius, o) for o in obstacles)
+
+    def update(self, dt: float, targets, player=None, obstacles=()) -> None:
         self.events = []
         self.hurt_events = []
         for atk in self.attacks:
@@ -41,12 +47,18 @@ class CombatSystem:
                 if not atk.pierce:
                     atk.kill()
                     break
+        for atk in self.attacks:
+            if self._blocked(atk, obstacles):
+                atk.kill()
         self.attacks = [a for a in self.attacks if a.active]
-        self._update_hostile(dt, player)
+        self._update_hostile(dt, player, obstacles)
 
-    def _update_hostile(self, dt: float, player) -> None:
+    def _update_hostile(self, dt: float, player, obstacles=()) -> None:
         for atk in self.hostile:
             atk.update(dt)
+            if self._blocked(atk, obstacles):
+                atk.kill()
+                continue
             if player is None or not player.alive or id(player) in atk.hit or not atk.overlaps(player):
                 continue
             res = compute_damage(atk, player)

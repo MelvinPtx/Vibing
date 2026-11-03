@@ -158,7 +158,7 @@ def test_room_composition_follows_room_number():
     assert {type(e) for e in m.enemies} == {Rattata}
     seen = set()
     for _ in range(40):
-        m.room_number = 4
+        m.room_number = 5            # -> salle 6 (la 5 est une salle de boss)
         m.start_room()
         seen |= {type(e) for e in m.enemies}
     assert seen == {Rattata, Zubat, Racaillou, Fantominus, Voltorbe}

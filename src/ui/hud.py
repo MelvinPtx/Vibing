@@ -21,12 +21,14 @@ class HUD:
 
     # --- HUD ---------------------------------------------------------------------
     def draw(self, surface, player, fps: float, room_number: int = 0, enemies_left: int = 0,
-             sprites=None) -> None:
+             sprites=None, boss=None) -> None:
         T.corner_brackets(surface)
         T.text(surface, f"{fps:.0f} FPS", 12, T.GREY, False, topleft=(80, 16))
         self._player_panel(surface, player, room_number, sprites)
         if room_number:
-            self._room_panel(surface, player, room_number, enemies_left)
+            self._room_panel(surface, player, room_number, enemies_left, boss)
+        if boss is not None and (boss.alive or boss.dying):
+            self._boss_bar(surface, boss)
         m = player.moveset                       # les capacités dépendent du starter
         T.prompt_bar(surface, [("Clic G", m["basic"].name), ("E", m["special"].name),
                                ("R", m["cast"].name), ("Espace", "Dash"), ("Échap", "Menu")],
@@ -53,12 +55,29 @@ class HUD:
         T.thin_bar(surface, (r.x + 94, r.y + 123, r.w - 110, 8),
                    p.iframes_left / S.DASH_IFRAMES, T.CYAN)
 
-    def _room_panel(self, surface, p, room_number, enemies_left) -> None:
+    def _boss_bar(self, surface, boss) -> None:
+        """Grande barre de PV du boss en haut de l'écran, avec les seuils de phase."""
+        r = pygame.Rect(0, 0, 420, 62)
+        r.midtop = (S.SCREEN_W // 2 - 70, 14)
+        T.alpha_rect(surface, r, T.NAVY, 205, 14)
+        nm = T.text(surface, boss.name, 20, T.WHITE, shadow=True, topleft=(r.x + 14, r.y + 8))
+        T.lv_pill(surface, f"Phase {boss.phase}", 12, midleft=(nm.right + 10, nm.centery))
+        x = r.right - 14
+        for t in reversed(boss.types):
+            x = T.type_pill(surface, t, 22, topright=(x, r.y + 8)).left - 6
+        bar = pygame.Rect(r.x + 14, r.y + 36, r.w - 28, 18)
+        T.hp_bar(surface, bar, boss.hp / boss.max_hp)
+        for frac in boss.PHASE_AT:                       # repères de changement de phase
+            pygame.draw.line(surface, T.NAVY_DARK, (bar.x + bar.w * frac, bar.y + 2), (bar.x + bar.w * frac, bar.bottom - 2), 3)
+
+    def _room_panel(self, surface, p, room_number, enemies_left, boss=None) -> None:
         r = pygame.Rect(S.SCREEN_W - 300, 20, 276, 46)
         T.alpha_rect(surface, r, T.NAVY, 185, 14)
         T.lv_pill(surface, f"Salle {room_number}", topleft=(r.x + 12, r.y + 10))
         status = (f"{enemies_left} ennemi{'s' if enemies_left > 1 else ''}"
                   if enemies_left else "Choisis une porte !")
+        if boss is not None and boss.alive:
+            status = "Boss !"
         T.text(surface, status, 17, T.WHITE if enemies_left else T.YELLOW, midright=(r.right - 14, r.centery))
         for i, mod in enumerate(p.modifiers):   # objets possédés : lignes façon menu
             rr = pygame.Rect(r.x, r.bottom + 8 + i * 42, r.w, 36)

@@ -25,6 +25,11 @@ class MoveSpec:
     reach: float = 44.0  # melee : distance devant le lanceur
     speed: float = 0.0   # projectile : px/s
 
+    def build_at(self, owner, pos) -> Attack:
+        """Zone posée à un endroit fixe (Séisme, éboulement...), qui ne suit pas le lanceur."""
+        return Attack(owner=owner, element=self.element, category=self.category, power=self.power,
+                      radius=self.radius, duration=self.duration, name=self.name, pos=Vector2(pos))
+
     def build(self, owner, direction: Vector2) -> Attack:
         common = dict(owner=owner, element=self.element, category=self.category, power=self.power,
                       radius=self.radius, duration=self.duration, name=self.name)
@@ -54,6 +59,16 @@ CRU_AILE = MoveSpec("Cru-Aile", PType.VOL, P, 26, "projectile", 0.60, "Shoot", 1
 ENEMY_BALLE_OMBRE = MoveSpec("Ball'Ombre", PType.SPECTRE, S, 14, "projectile", 2.4, "Shoot", 10, 2.5,
                              speed=250)
 EXPLOSION = MoveSpec("Explosion", PType.NORMAL, P, 32, "burst", 0.0, "Attack", 90, 0.20)
+
+
+# --- Capacités de boss --------------------------------------------------------------
+JET_PIERRES = MoveSpec("Jet-Pierres", PType.ROCHE, P, 15, "projectile", 0.0, "Shoot", 14, 2.4, speed=310)
+SEISME = MoveSpec("Séisme", PType.SOL, P, 26, "burst", 0.0, "Swing", 230, 0.25)
+EBOULEMENT = MoveSpec("Éboulement", PType.ROCHE, P, 22, "burst", 0.0, "Attack", 62, 0.2)
+BOSS_BALLE_OMBRE = MoveSpec("Ball'Ombre", PType.SPECTRE, S, 15, "projectile", 0.0, "Shoot", 11, 3.0,
+                            speed=270)
+POING_OMBRE = MoveSpec("Poing Ombre", PType.SPECTRE, P, 24, "burst", 0.0, "Attack", 110, 0.22)
+BOMBE_BEURK = MoveSpec("Bombe Beurk", PType.POISON, S, 18, "burst", 0.0, "Swing", 70, 0.2)
 
 
 # Fabriques historiques (utilisées par les tests)

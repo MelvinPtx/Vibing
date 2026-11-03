@@ -18,6 +18,7 @@ from .. import settings as S
 from ..combat import moves as M
 from ..combat.types import PType
 from ..species import GASTLY_DEX, GEODUDE_DEX, RATTATA_DEX, VOLTORB_DEX, ZUBAT_DEX
+from ..geometry import resolve
 from .entity import Entity, Stats
 
 
@@ -28,6 +29,7 @@ class Enemy(Entity):
     contact_damage = 10.0
     contact_cooldown = 0.8   # s entre deux touches
     separation_radius = 46.0
+    flies = False            # True : passe au-dessus des obstacles et ignore la navigation
 
     def __init__(self, pos, radius, color, types, max_hp, stats: Stats | None = None):
         super().__init__(pos, radius, color, types, max_hp)
@@ -40,6 +42,8 @@ class Enemy(Entity):
         self.act_anim, self.act_left = "Attack", 0.0   # animation d'action en cours (tir, charge...)
         self.sprite_nonce = 0
         self.out_attacks: list = []                    # attaques hostiles créées, récupérées par la salle
+        self.obstacles: list = []                      # rochers de la salle (fournis par le RoomManager)
+        self.nav = None                                # NavGrid de la salle (contournement)
 
     # --- état / rendu de sprites ---
     @property
@@ -95,6 +99,13 @@ class Enemy(Entity):
     def speed_cap(self) -> float:
         return self.speed
 
+    def chase_point(self, player) -> Vector2:
+        """Où viser pour rejoindre le joueur : lui-même si le chemin est dégagé, sinon le prochain
+        point d'un chemin qui contourne les obstacles."""
+        if self.flies or self.nav is None or self.nav.line_clear(self.pos, player.pos, self.radius):
+            return player.pos
+        return self.nav.next_point(self.pos, player.pos)
+
     def seek(self, target: Vector2) -> Vector2:
         to = target - self.pos
         if to.length_squared() == 0:
@@ -114,7 +125,7 @@ class Enemy(Entity):
 
     def think(self, dt: float, player, others) -> Vector2:
         """Force de pilotage de cette frame (à redéfinir par espèce)."""
-        return self.seek(player.pos) + self.separation(others)
+        return self.seek(self.chase_point(player)) + self.separation(others)
 
     def update(self, dt: float, player=None, others=(), bounds: pygame.Rect | None = None) -> None:
         self.flash = max(0.0, self.flash - dt)
@@ -138,6 +149,8 @@ class Enemy(Entity):
         if self.vel.length() > self.speed_cap:
             self.vel.scale_to_length(self.speed_cap)
         self.pos += self.vel * dt
+        if not self.flies and self.obstacles:
+            resolve(self.pos, self.radius, self.obstacles)
         if self.vel.length_squared() > 1:
             self.facing = self.vel.normalize()
         if bounds is not None:
@@ -175,7 +188,8 @@ class Rattata(Enemy):
 
 
 class Zubat(Enemy):
-    """Rapide et fragile : zigzague autour de sa trajectoire."""
+    """Rapide et fragile : vole en zigzag, au-dessus des obstacles."""
+    flies = True
     name = "Zubat"
     species = ZUBAT_DEX
     speed = 235.0
@@ -229,7 +243,7 @@ class Racaillou(Enemy):
         if self.state == "walk":
             if self.state_t <= 0 and to.length() < 340:
                 self.state, self.state_t = "windup", self.WINDUP
-            return self.seek(player.pos) + self.separation(others)
+            return self.seek(self.chase_point(player)) + self.separation(others)
         if self.state == "windup":                        # s'arrête et vise
             if self.state_t <= 0:
                 self._dir = to.normalize() if to.length_squared() else Vector2(0, 1)
@@ -246,7 +260,9 @@ class Racaillou(Enemy):
 
 
 class Fantominus(Enemy):
-    """Tireur : reste à bonne distance (fuit si on s'approche) et lance des Ball'Ombre."""
+    """Tireur : reste à bonne distance (fuit si on s'approche) et lance des Ball'Ombre. Flotte au-dessus
+    des obstacles, mais ses tirs, eux, sont bloqués : les rochers servent d'abris."""
+    flies = True
     name = "Fantominus"
     species = GASTLY_DEX
     speed = 100.0
@@ -313,5 +329,5 @@ class Voltorbe(Enemy):
                 self.fire(M.EXPLOSION, Vector2(0, 1))     # zone centrée sur lui
                 Entity.take_damage(self, self.max_hp)     # il se sacrifie
                 return Vector2()
-            return self.seek(player.pos) * 0.25 + self.separation(others)
-        return self.seek(player.pos) + self.separation(others)
+            return self.seek(self.chase_point(player)) * 0.25 + self.separation(others)
+        return self.seek(self.chase_point(player)) + self.separation(others)

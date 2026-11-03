@@ -22,7 +22,7 @@ ASSET_DIR = Path(__file__).resolve().parents[2] / "assets" / "sprites"
 TICK = 1 / 60
 LOOPING = frozenset({"Idle", "Walk"})
 FALLBACKS = {"Swing": ("Attack",), "Shoot": ("Attack",), "Attack": ("Idle",),
-             "Hurt": ("Idle",), "Walk": ("Idle",), "Faint": ("Hurt", "Idle")}
+             "Hurt": ("Idle",), "Walk": ("Idle",), "Faint": ("Hurt", "Idle"), "Charge": ("Attack", "Idle")}
 DEATH_FLASH = 0.12   # s : flash blanc au moment de la mort
 CYAN_TINT = (0, 70, 90)
 
@@ -172,7 +172,7 @@ class SpriteRenderer:
             st = self._state[entity] = [name, 0.0, speed, nonce]
         st[2] = speed
         idx = anim.index_at(st[1], anim.name in LOOPING)
-        frame = sset.frame(anim, direction_index(entity.facing), idx, self.scale)
+        frame = sset.frame(anim, direction_index(entity.facing), idx, getattr(entity, "sprite_scale", self.scale))
 
         x, y = round(entity.pos.x), round(entity.pos.y)
         r = entity.radius
@@ -199,7 +199,7 @@ class SpriteRenderer:
             anim, idx = faint, faint.index_at(t * max(1.0, faint.total / 0.5), False)
         else:
             anim, idx = sset.anim("Hurt"), 0
-        frame = sset.frame(anim, direction, idx, self.scale)
+        frame = sset.frame(anim, direction, idx, getattr(entity, "sprite_scale", self.scale))
         x, y = round(entity.pos.x), round(entity.pos.y)
         k = max(0.0, min(1.0, (t - DEATH_FLASH) / (total - DEATH_FLASH)))   # 0 -> 1 pendant le fondu
         r = entity.radius
