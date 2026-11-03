@@ -3,15 +3,16 @@ from pygame import Vector2
 
 from . import settings as S
 from .combat import CombatSystem
-from .combat.types import PType
 from .entities import Intent, Player, PlayerController, TrainingDummy
 from .items import apply_reward, roll_choices
 from .levels import RoomManager
+from .species import DUMMY_ROSTER
 from .ui import HUD
 from .ui.floating_text import FloatingTexts
 from .ui.pause_menu import PauseMenu
 from .ui.reward_menu import RewardMenu
 from .ui.room_view import RoomView
+from .ui.sprites import SpriteRenderer
 
 MOVE_KEYS = {
     "left": (pygame.K_q, pygame.K_a, pygame.K_LEFT),
@@ -21,8 +22,6 @@ MOVE_KEYS = {
 }
 DASH_KEYS = (pygame.K_SPACE, pygame.K_LSHIFT, pygame.K_RSHIFT)
 ATTACK_KEYS = {pygame.K_e: "special", pygame.K_r: "cast", pygame.K_j: "basic"}
-DUMMY_TYPES = [(PType.NORMAL,), (PType.FEU,), (PType.EAU,), (PType.PLANTE,),
-               (PType.SPECTRE,), (PType.INSECTE, PType.PLANTE)]
 
 
 class Game:
@@ -36,6 +35,7 @@ class Game:
         self.training = training
         self.hud = HUD()
         self.view = RoomView()
+        self.sprites = SpriteRenderer()
         self.texts = FloatingTexts()
         self.running = True
         self.reset()
@@ -50,9 +50,10 @@ class Game:
         self.texts.items.clear()
         if self.training:
             self.room = None
-            n = len(DUMMY_TYPES)
+            n = len(DUMMY_ROSTER)
             self.dummies = [TrainingDummy((self.arena.left + (i + 1) * self.arena.width / (n + 1),
-                                           self.arena.top + 110), t) for i, t in enumerate(DUMMY_TYPES)]
+                                           self.arena.top + 130), types, dex, name)
+                            for i, (name, dex, types) in enumerate(DUMMY_ROSTER)]
         else:
             self.dummies = []
             self.room = RoomManager(self.arena, self.player)
@@ -142,6 +143,7 @@ class Game:
             if res.label:
                 self.texts.add(target.pos - Vector2(0, 70), res.label, color)
         self.texts.update(dt)
+        self.sprites.update(dt)
 
     def draw(self) -> None:
         self.screen.fill(S.BG)
@@ -151,21 +153,23 @@ class Game:
             pygame.draw.rect(self.screen, S.FLOOR, self.arena)
             pygame.draw.rect(self.screen, S.WALL, self.arena, 6)
         entities = self.room.enemies if self.room else self.dummies
-        for e in entities:
-            e.draw(self.screen)
+        for e in sorted([*entities, self.player], key=lambda e: e.pos.y):   # profondeur : le plus bas devant
+            if self.sprites.draw(self.screen, e):
+                e.draw_status(self.screen)
+            else:
+                e.draw(self.screen)             # pas de sprite : cercle de secours
         for a in self.combat.attacks:
             pygame.draw.circle(self.screen, (255, 255, 255), a.pos, a.radius, 2)
-        self.player.draw(self.screen)
         self.hud.draw_world(self.screen, entities, show_types=self.training)
         self.texts.draw(self.screen)
         room_number = self.room.room_number if self.room else 0
         if self.menu:
             self.menu.draw(self.screen)
         elif self.pause:
-            self.pause.draw(self.screen, self.player, room_number)
+            self.pause.draw(self.screen, self.player, room_number, self.sprites)
         elif self.game_over:
             self.view.draw_game_over(self.screen, self.player, room_number)
         else:
             self.hud.draw(self.screen, self.player, self.clock.get_fps(), room_number,
-                          len(self.room.enemies) if self.room else 0)
+                          len(self.room.enemies) if self.room else 0, self.sprites)
         pygame.display.flip()

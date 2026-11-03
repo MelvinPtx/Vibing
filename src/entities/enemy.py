@@ -7,6 +7,7 @@ from pygame import Vector2
 
 from .. import settings as S
 from ..combat.types import PType
+from ..species import RATTATA_DEX
 from .entity import Entity
 
 
@@ -24,6 +25,25 @@ class Enemy(Entity):
         self.spawn_left = S.SPAWN_DELAY
         self.contact_cd = 0.0
         self.flash = 0.0
+        self.sprite_nonce = 0
+
+    @property
+    def sprite_visible(self) -> bool:
+        return self.alive and not self.spawning
+
+    @property
+    def sprite_anim(self) -> tuple:
+        if self.flash > 0:
+            return ("Hurt", 1.0)
+        if self.contact_cd > self.contact_cooldown - 0.35:
+            return ("Attack", 1.6)
+        v = self.vel.length()
+        return ("Walk", max(0.8, 1.3 * v / self.speed)) if v > 10 else ("Idle", 1.0)
+
+    def register_hit(self) -> None:
+        """Appelé quand le contact a touché le joueur : délai avant la prochaine touche + animation."""
+        self.contact_cd = self.contact_cooldown
+        self.sprite_nonce += 1
 
     @property
     def spawning(self) -> bool:
@@ -75,6 +95,8 @@ class Enemy(Entity):
         if self.vel.length() > self.speed:
             self.vel.scale_to_length(self.speed)
         self.pos += self.vel * dt
+        if self.vel.length_squared() > 1:
+            self.facing = self.vel.normalize()
         if bounds is not None:
             r = self.radius
             self.pos.x = min(max(self.pos.x, bounds.left + r), bounds.right - r)
@@ -98,7 +120,8 @@ class Enemy(Entity):
 
 class Rattata(Enemy):
     name = "Rattata"
+    species = RATTATA_DEX
     speed = 150.0
 
     def __init__(self, pos):
-        super().__init__(pos, 14, (160, 110, 190), (PType.NORMAL,), max_hp=60)
+        super().__init__(pos, 18, (160, 110, 190), (PType.NORMAL,), max_hp=60)

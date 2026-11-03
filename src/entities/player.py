@@ -10,8 +10,9 @@ import pygame
 from pygame import Vector2
 
 from .. import settings as S
-from ..combat.moves import COOLDOWNS, MOVES
+from ..combat.moves import COOLDOWNS, MOVE_ANIMS, MOVES
 from ..combat.types import PType
+from ..species import PLAYER_DEX
 from .entity import Entity
 
 
@@ -24,10 +25,14 @@ class Intent:
 
 
 class Player(Entity):
+    species = PLAYER_DEX
+
     def __init__(self, pos):
         super().__init__(pos, S.PLAYER_RADIUS, S.YELLOW, types=(PType.NORMAL,),
                          max_hp=S.PLAYER_MAX_HP)
         self.name = S.PLAYER_NAME
+        self.moving = False
+        self.act_anim, self.act_left, self.act_nonce = "Attack", 0.0, 0   # animation d'attaque en cours
         self.atk_cd = {k: 0.0 for k in COOLDOWNS}
         self.modifiers: list = []   # Modifier actifs (src/items)
         self.facing = Vector2(1, 0)
@@ -42,6 +47,33 @@ class Player(Entity):
     def invincible(self) -> bool:
         """À consulter par le système de dégâts (phase 2+)."""
         return self.iframes_left > 0 or self.hurt_left > 0
+
+    # --- rendu de sprites ---
+    @property
+    def sprite_visible(self) -> bool:
+        return True
+
+    @property
+    def sprite_nonce(self) -> int:
+        return self.act_nonce
+
+    @property
+    def sprite_anim(self) -> tuple:
+        if self.hurt_left > S.HIT_IFRAMES - 0.3:
+            return ("Hurt", 1.0)
+        if self.act_left > 0:
+            return (self.act_anim, 1.5)
+        if self.dashing:
+            return ("Walk", 2.2)
+        return ("Walk", 1.0) if self.moving else ("Idle", 1.0)
+
+    @property
+    def sprite_blink(self) -> bool:     # clignote pendant l'invincibilité post-coup
+        return self.hurt_left > 0 and int(self.hurt_left * 18) % 2 == 0
+
+    @property
+    def sprite_tint(self):              # teinte cyan pendant les i-frames du dash
+        return (0, 70, 90) if self.iframes_left > 0 else None
 
     def take_damage(self, amount: float) -> bool:
         if self.invincible:
@@ -80,6 +112,7 @@ class PlayerController:
         p.iframes_left = max(0.0, p.iframes_left - dt)
         p.dash_cd_left = max(0.0, p.dash_cd_left - dt)
         p.hurt_left = max(0.0, p.hurt_left - dt)
+        p.act_left = max(0.0, p.act_left - dt)
         for mod in p.modifiers:
             mod.on_update(p, dt)
         p.trail = [(pos, life - dt * 5) for pos, life in p.trail if life - dt * 5 > 0]
@@ -89,6 +122,7 @@ class PlayerController:
             move = move.normalize()
             if not p.dashing:
                 p.facing = Vector2(move)
+        p.moving = move.length_squared() > 0
 
         # Démarrage du dash
         if intent.dash and not p.dashing and p.dash_cd_left <= 0:
@@ -116,6 +150,8 @@ class PlayerController:
                 p.facing = (intent.aim - p.pos).normalize()
             atk = MOVES[intent.attack](p, Vector2(p.facing))
             atk.slot = intent.attack
+            p.act_anim, p.act_left = MOVE_ANIMS[intent.attack], 0.35
+            p.act_nonce += 1
             for mod in p.modifiers:
                 mod.on_attack(atk, p)
             spawned.append(atk)

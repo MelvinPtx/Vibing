@@ -16,10 +16,16 @@ class TrainingDummy(Entity):
 
     name = "Mannequin"
 
-    def __init__(self, pos, types, max_hp: float = 300):
-        super().__init__(pos, 24, TYPE_COLORS.get(types[0], S.GREY), types, max_hp)
+    def __init__(self, pos, types, species=None, name: str = "Mannequin", max_hp: float = 300):
+        super().__init__(pos, 30, TYPE_COLORS.get(types[0], S.GREY), types, max_hp)
+        self.species = species
+        self.name = name
         self.flash = 0.0
         self.respawn = 0.0
+
+    @property
+    def sprite_anim(self) -> tuple:
+        return ("Hurt", 1.0) if self.flash > 0 else ("Idle", 1.0)
 
     def take_damage(self, amount: float) -> bool:
         if not self.alive:

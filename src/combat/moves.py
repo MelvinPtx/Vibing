@@ -6,6 +6,8 @@ from .types import PType
 
 # cooldowns (s) par emplacement
 COOLDOWNS = {"basic": 0.30, "special": 0.90, "cast": 0.60}
+# animation PMD jouée par le lanceur pour chaque emplacement
+MOVE_ANIMS = {"basic": "Attack", "special": "Swing", "cast": "Shoot"}
 
 
 def vive_attaque(owner, direction: Vector2) -> Attack:

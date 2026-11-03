@@ -13,29 +13,32 @@ class HUD:
             if not e.alive or getattr(e, "spawning", False):
                 continue
             bar = pygame.Rect(0, 0, 64, 12)
-            bar.midbottom = (e.pos.x, e.pos.y - e.radius - 8)
+            bar.midbottom = (e.pos.x, e.pos.y - e.radius - 26)   # au-dessus du sprite
             T.hp_bar(surface, bar, e.hp / e.max_hp)
             T.text(surface, e.name, 14, T.WHITE, shadow=True, midbottom=(bar.centerx, bar.top - 2))
             if show_types and e.types:
-                T.type_pills(surface, e.types, int(e.pos.x), int(e.pos.y + e.radius + 8), 18)
+                T.type_pills(surface, e.types, int(e.pos.x), int(e.pos.y + e.radius + 14), 18)
 
     # --- HUD ---------------------------------------------------------------------
-    def draw(self, surface, player, fps: float, room_number: int = 0, enemies_left: int = 0) -> None:
+    def draw(self, surface, player, fps: float, room_number: int = 0, enemies_left: int = 0,
+             sprites=None) -> None:
         T.corner_brackets(surface)
         T.text(surface, f"{fps:.0f} FPS", 12, T.GREY, False, topleft=(80, 16))
-        self._player_panel(surface, player, room_number)
+        self._player_panel(surface, player, room_number, sprites)
         if room_number:
             self._room_panel(surface, player, room_number, enemies_left)
         T.prompt_bar(surface, [("Clic G", "Attaque"), ("E", "Tranch'Herbe"), ("R", "Ball'Ombre"),
                                ("Espace", "Dash"), ("Échap", "Menu")],
                      S.SCREEN_W - 28, S.SCREEN_H - 24)
 
-    def _player_panel(self, surface, p, room_number) -> None:
+    def _player_panel(self, surface, p, room_number, sprites=None) -> None:
         r = pygame.Rect(24, S.SCREEN_H - 158, 308, 140)
         T.alpha_rect(surface, r, T.NAVY, 185, 14)
         T.lv_pill(surface, f"Salle {room_number}" if room_number else "Entraînement",
                   topleft=(r.x + 16, r.y + 12))
         T.text(surface, p.name, 24, T.WHITE, shadow=True, topleft=(r.x + 16, r.y + 38))
+        if sprites:   # icône du Pokémon, comme dans la liste d'équipe
+            sprites.draw_icon(surface, p.species, (r.right - 52, r.y + 40), "Idle", 0, 3)
         T.hp_bar(surface, (r.x + 14, r.y + 70, r.w - 28, 26), p.hp / p.max_hp,
                  f"{p.hp:.0f}/{p.max_hp:.0f}")
         ready = 1 - p.dash_cd_left / S.DASH_COOLDOWN

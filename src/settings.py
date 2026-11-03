@@ -16,7 +16,7 @@ RED = (230, 70, 70)
 GREY = (110, 110, 120)
 
 # Joueur (valeurs de départ, ex. Pikachu-like)
-PLAYER_RADIUS = 16
+PLAYER_RADIUS = 20
 PLAYER_SPEED = 280.0          # px/s
 PLAYER_MAX_HP = 100
 

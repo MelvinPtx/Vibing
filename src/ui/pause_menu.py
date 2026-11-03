@@ -79,14 +79,14 @@ class PauseMenu:
         return action
 
     # --- rendu ---------------------------------------------------------------
-    def draw(self, surface, player, room_number: int = 0) -> None:
+    def draw(self, surface, player, room_number: int = 0, sprites=None) -> None:
         surface.blit(T.blurred_backdrop(surface), (0, 0))
         if self.screen == "status":
-            self._draw_status(surface, player, room_number)
+            self._draw_status(surface, player, room_number, sprites)
         else:
-            self._draw_main(surface, player, room_number)
+            self._draw_main(surface, player, room_number, sprites)
 
-    def _draw_main(self, surface, player, room_number) -> None:
+    def _draw_main(self, surface, player, room_number, sprites=None) -> None:
         # Équipe (ligne jaune sélectionnée, comme le Pokémon de tête)
         r = pygame.Rect(34, 104, 360, 92)
         pygame.draw.rect(surface, T.YELLOW, r, border_radius=10)
@@ -97,9 +97,10 @@ class PauseMenu:
         T.lv_pill(surface, f"Salle {room_number}" if room_number else "Entraînement",
                   topright=(r.right - 14, r.y + 10))
         c = (r.right - 62, r.centery + 12)
-        pygame.draw.circle(surface, T.YELLOW_TXT, c, 25)
-        pygame.draw.circle(surface, player.color, c, 21)
-        pygame.draw.line(surface, T.YELLOW_TXT, c, (c[0] + 25, c[1]), 3)
+        if not (sprites and sprites.draw_icon(surface, player.species, (c[0], c[1] - 4), "Idle", 0, 3)):
+            pygame.draw.circle(surface, T.YELLOW_TXT, c, 25)
+            pygame.draw.circle(surface, player.color, c, 21)
+            pygame.draw.line(surface, T.YELLOW_TXT, c, (c[0] + 25, c[1]), 3)
 
         # MAIN MENU
         T.alpha_rect(surface, MENU, T.NAVY, 190, 14)
@@ -113,7 +114,7 @@ class PauseMenu:
         T.prompt_bar(surface, [("↑↓", "Choisir"), ("Entrée", "Valider"), ("Échap", "Reprendre")],
                      S.SCREEN_W - 20, S.SCREEN_H - 20)
 
-    def _draw_status(self, surface, player, room_number) -> None:
+    def _draw_status(self, surface, player, room_number, sprites=None) -> None:
         T.header(surface, "RÉSUMÉ DU POKÉMON", T.ORANGE, T.ORANGE_PAT, "i")
         # sous-barre « Résumé »
         T.alpha_rect(surface, (0, 62, S.SCREEN_W, 40), T.NAVY_DARK, 210, 0)
@@ -125,9 +126,10 @@ class PauseMenu:
         T.alpha_rect(surface, pr, T.NAVY, 190, 12)
         pygame.draw.rect(surface, (255, 255, 255), pr, 2, border_radius=12)
         c = (pr.centerx, pr.y + 170)
-        pygame.draw.circle(surface, (255, 255, 255), c, 92)
-        pygame.draw.circle(surface, player.color, c, 84)
-        pygame.draw.line(surface, (255, 255, 255), c, (c[0] + 84, c[1]), 6)
+        if not (sprites and sprites.draw_icon(surface, player.species, c, "Idle", 0, 6)):
+            pygame.draw.circle(surface, (255, 255, 255), c, 92)
+            pygame.draw.circle(surface, player.color, c, 84)
+            pygame.draw.line(surface, (255, 255, 255), c, (c[0] + 84, c[1]), 6)
         T.alpha_rect(surface, (pr.x, pr.bottom - 64, pr.w, 64), T.NAVY_DARK, 235, 12)
         T.text(surface, player.name, 24, T.WHITE, midleft=(pr.x + 18, pr.bottom - 32))
         T.lv_pill(surface, f"Salle {room_number}" if room_number else "Entraînement",

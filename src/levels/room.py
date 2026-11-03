@@ -81,7 +81,7 @@ class RoomManager:
             for e in self.enemies:
                 e.update(dt, self.player, self.enemies, self.arena)
                 if e.can_touch(self.player) and self.player.take_damage(e.contact_damage):
-                    e.contact_cd = e.contact_cooldown
+                    e.register_hit()
             self.enemies = [e for e in self.enemies if e.alive]
             if not self.enemies:
                 self._open_doors()

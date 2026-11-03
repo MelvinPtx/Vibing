@@ -16,12 +16,14 @@ class Entity:
     """Base de toute entité : position, hitbox cercle, types, stats, PV."""
 
     name = ""
+    species = None            # n° de Pokédex du sprite (None = cercle de secours)
 
     def __init__(self, pos, radius: float, color, types=(), max_hp: float = 100):
         self.pos = Vector2(pos)
         self.radius = radius
         self.color = color
         self.alive = True
+        self.facing = Vector2(0, 1)
         self.types = tuple(types)
         self.stats = Stats()
         self.max_hp = max_hp
@@ -29,6 +31,16 @@ class Entity:
         self.burn_left = 0.0
         self.burn_dps = 0.0
         self._burn_tick = 0.0
+
+    # --- infos lues par le rendu de sprites (src/ui/sprites.py) ---
+    @property
+    def sprite_visible(self) -> bool:
+        return self.alive
+
+    @property
+    def sprite_anim(self) -> tuple:
+        """(nom d'animation PMD, vitesse de lecture)."""
+        return ("Idle", 1.0)
 
     @property
     def rect(self) -> pygame.Rect:
