@@ -24,6 +24,9 @@ class Entity:
         self.stats = Stats()
         self.max_hp = max_hp
         self.hp = max_hp
+        self.burn_left = 0.0
+        self.burn_dps = 0.0
+        self._burn_tick = 0.0
 
     @property
     def rect(self) -> pygame.Rect:
@@ -37,6 +40,25 @@ class Entity:
         if self.hp == 0:
             self.alive = False
         return True
+
+    def apply_burn(self, duration: float, dps: float) -> None:
+        self.burn_left = max(self.burn_left, duration)
+        self.burn_dps = max(self.burn_dps, dps)
+
+    def tick_status(self, dt: float) -> None:
+        """Brûlure : dégâts bruts toutes les 0,5 s (hors table des types)."""
+        if self.burn_left <= 0 or not self.alive:
+            self.burn_left, self.burn_dps = 0.0, 0.0
+            return
+        self.burn_left -= dt
+        self._burn_tick += dt
+        if self._burn_tick >= 0.5:
+            self._burn_tick -= 0.5
+            self.take_damage(self.burn_dps * 0.5)
+
+    def draw_status(self, surface) -> None:
+        if self.burn_left > 0 and self.alive:
+            pygame.draw.circle(surface, (255, 140, 30), self.pos, self.radius + 4, 3)
 
     def update(self, dt: float) -> None:
         pass

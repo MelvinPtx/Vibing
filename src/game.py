@@ -5,9 +5,11 @@ from . import settings as S
 from .combat import CombatSystem
 from .combat.types import PType
 from .entities import Intent, Player, PlayerController, TrainingDummy
+from .items import apply_reward, roll_choices
 from .levels import RoomManager
 from .ui import DebugHUD
 from .ui.floating_text import FloatingTexts
+from .ui.reward_menu import RewardMenu
 from .ui.room_view import RoomView
 
 MOVE_KEYS = {
@@ -42,6 +44,7 @@ class Game:
         self.player = Player(self.arena.center)
         self.controller = PlayerController(self.player, self.arena)
         self.combat = CombatSystem()
+        self.menu = None
         self.texts.items.clear()
         if self.training:
             self.room = None
@@ -71,6 +74,10 @@ class Game:
             for e in pygame.event.get():
                 if e.type == pygame.QUIT or (e.type == pygame.KEYDOWN and e.key == pygame.K_ESCAPE):
                     self.running = False
+                elif self.menu:
+                    chosen = self.menu.handle_event(e)
+                    if chosen:
+                        self.pick_reward(chosen)
                 elif e.type == pygame.KEYDOWN and e.key == pygame.K_RETURN and self.game_over:
                     self.reset()
                 elif e.type == pygame.KEYDOWN and e.key in DASH_KEYS:
@@ -85,16 +92,22 @@ class Game:
             self.draw()
         pygame.quit()
 
+    def pick_reward(self, mod) -> None:
+        apply_reward(self.player, mod)
+        self.texts.add(self.player.pos - Vector2(0, 40), mod.name, S.YELLOW)
+        self.menu = None
+
     def update(self, intent: Intent, dt: float) -> None:
-        if self.game_over:
+        if self.game_over or self.menu:
             return
         for atk in self.controller.update(intent, dt):
             self.combat.spawn(atk)
         if self.room:
             reward = self.room.update(dt)
             if reward:
-                self.texts.add(self.player.pos - Vector2(0, 40), f"Récompense : {reward.value}", S.YELLOW)
                 self.combat.attacks.clear()
+                self.menu = RewardMenu(roll_choices(reward, self.player))
+                return
             targets = self.room.targets
         else:
             for d in self.dummies:
@@ -124,6 +137,8 @@ class Game:
         self.hud.draw(self.screen, self.player, self.clock.get_fps())
         if self.room:
             self.hud.draw_run(self.screen, self.player, self.room.room_number, len(self.room.enemies))
+        if self.menu:
+            self.menu.draw(self.screen)
         if self.game_over:
             self.view.draw_overlay(self.screen, "K.O. !", "ENTRÉE : recommencer")
         pygame.display.flip()

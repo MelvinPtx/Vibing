@@ -62,6 +62,7 @@ class Enemy(Entity):
     def update(self, dt: float, player=None, others=(), bounds: pygame.Rect | None = None) -> None:
         self.flash = max(0.0, self.flash - dt)
         self.contact_cd = max(0.0, self.contact_cd - dt)
+        self.tick_status(dt)
         if self.spawning:
             self.spawn_left -= dt
             return
@@ -92,6 +93,7 @@ class Enemy(Entity):
             return
         pygame.draw.circle(surface, S.WHITE if self.flash > 0 else self.color, self.pos, self.radius)
         pygame.draw.circle(surface, (20, 20, 20), self.pos, self.radius, 2)
+        self.draw_status(surface)
         w = 34
         x, y = self.pos.x - w / 2, self.pos.y - self.radius - 10
         pygame.draw.rect(surface, (60, 20, 20), (x, y, w, 5))

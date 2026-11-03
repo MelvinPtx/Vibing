@@ -20,6 +20,8 @@ class DebugHUD:
         self._bar(surface, x, y, w, 14, player.hp / player.max_hp, S.RED, f"{player.hp:.0f}")
         txt = f"Salle {room_number} · " + (f"{enemies_left} ennemis" if enemies_left else "Choisis une porte !")
         surface.blit(self.font.render(txt, True, S.WHITE), (x, y + 24))
+        for i, mod in enumerate(player.modifiers):
+            surface.blit(self.font.render(f"• {mod.name}", True, S.YELLOW), (x, y + 48 + i * 18))
 
     def draw(self, surface, player, fps: float) -> None:
         ready = 1 - player.dash_cd_left / S.DASH_COOLDOWN

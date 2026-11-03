@@ -28,6 +28,7 @@ class Player(Entity):
         super().__init__(pos, S.PLAYER_RADIUS, S.YELLOW, types=(PType.NORMAL,),
                          max_hp=S.PLAYER_MAX_HP)
         self.atk_cd = {k: 0.0 for k in COOLDOWNS}
+        self.modifiers: list = []   # Modifier actifs (src/items)
         self.facing = Vector2(1, 0)
         # État du dash (écrit par le contrôleur, lu par le rendu / le combat)
         self.dashing = False
@@ -78,6 +79,8 @@ class PlayerController:
         p.iframes_left = max(0.0, p.iframes_left - dt)
         p.dash_cd_left = max(0.0, p.dash_cd_left - dt)
         p.hurt_left = max(0.0, p.hurt_left - dt)
+        for mod in p.modifiers:
+            mod.on_update(p, dt)
         p.trail = [(pos, life - dt * 5) for pos, life in p.trail if life - dt * 5 > 0]
 
         move = Vector2(intent.move)
@@ -110,7 +113,11 @@ class PlayerController:
         if intent.attack in MOVES and p.atk_cd[intent.attack] <= 0 and not p.dashing:
             if intent.aim is not None and (intent.aim - p.pos).length_squared() > 1:
                 p.facing = (intent.aim - p.pos).normalize()
-            spawned.append(MOVES[intent.attack](p, Vector2(p.facing)))
+            atk = MOVES[intent.attack](p, Vector2(p.facing))
+            atk.slot = intent.attack
+            for mod in p.modifiers:
+                mod.on_attack(atk, p)
+            spawned.append(atk)
             p.atk_cd[intent.attack] = COOLDOWNS[intent.attack]
         return spawned
 

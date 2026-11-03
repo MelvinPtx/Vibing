@@ -32,6 +32,7 @@ class TrainingDummy(Entity):
 
     def update(self, dt: float) -> None:
         self.flash = max(0.0, self.flash - dt)
+        self.tick_status(dt)
         if not self.alive:
             self.respawn -= dt
             if self.respawn <= 0:
@@ -43,6 +44,7 @@ class TrainingDummy(Entity):
         color = S.WHITE if self.flash > 0 else self.color
         pygame.draw.circle(surface, color, self.pos, self.radius)
         pygame.draw.circle(surface, (20, 20, 20), self.pos, self.radius, 3)
+        self.draw_status(surface)
         w = 60
         x, y = self.pos.x - w / 2, self.pos.y - self.radius - 14
         pygame.draw.rect(surface, (60, 20, 20), (x, y, w, 6))

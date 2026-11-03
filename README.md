@@ -8,6 +8,7 @@ python main.py --training      # mannequins d'entraînement (phase 2)
 python -m tests.test_dash      # tests headless du déplacement / dash
 python -m tests.test_combat    # tests headless table des types / dégâts
 python -m tests.test_rooms     # tests headless ennemis / salles / portes
+python -m tests.test_items     # tests headless modificateurs / récompenses
 ```
 Contrôles : ZQSD / WASD / flèches = bouger · Espace / Maj / clic droit = Dash · Échap = quitter.
 
@@ -17,4 +18,5 @@ Contrôles : ZQSD / WASD / flèches = bouger · Espace / Maj / clic droit = Dash
 - `src/entities/` : `Entity` (base), `Player` (données + rendu), `PlayerController` (logique move/dash).
 - `src/combat/` : (phase 2) types, attaques, dégâts.
 - `src/levels/` : (phase 3) salles, RoomManager.
-- `src/ui/` : HUD / menus.
+- `src/items/` : modificateurs passifs (`on_attack` / `on_update` / `on_pickup`) et catalogue de récompenses.
+- `src/ui/` : HUD, vue de salle, menu de récompense.
