@@ -83,10 +83,10 @@ def _ct(label, slot, element, slot_label):
         "description": f"{slot_label} devient de type {element.value}."})
 
 
-LanceFlammes = _ct("Lance-Flammes", "special", PType.FEU, "Tranch'Herbe (E)")
-Surf = _ct("Surf", "cast", PType.EAU, "Ball'Ombre (R)")
-RayonGlace = _ct("Rayon Glace", "cast", PType.GLACE, "Ball'Ombre (R)")
-Seisme = _ct("Séisme", "special", PType.SOL, "Tranch'Herbe (E)")
+LanceFlammes = _ct("Lance-Flammes", "special", PType.FEU, "La capacité de zone (E)")
+Surf = _ct("Surf", "cast", PType.EAU, "Le projectile (R)")
+RayonGlace = _ct("Rayon Glace", "cast", PType.GLACE, "Le projectile (R)")
+Seisme = _ct("Séisme", "special", PType.SOL, "La capacité de zone (E)")
 
 
 # --- Baies : effet immédiat ---------------------------------------------

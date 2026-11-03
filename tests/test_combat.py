@@ -38,6 +38,16 @@ def test_damage_by_type():
         assert compute_damage(mv(me, d), dummy(types)).amount == expected, (mv.__name__, types)
 
 
+def test_tranch_herbe_is_physical_and_uses_the_attack_stat():
+    from src.combat.attack import Category
+    from src.starters import SPRIGATITO
+    atk = tranch_herbe(Player((0, 0), SPRIGATITO), Vector2(1, 0))
+    assert atk.category is Category.PHYSICAL
+    water = Entity((50, 0), 20, (0, 0, 0), [P.EAU], max_hp=1000)
+    # 35 x Atq 1,0 (et non Atq. Spé. 1,1) x 2 (Plante > Eau) x 1,5 (STAB)
+    assert abs(compute_damage(atk, water).amount - 35 * 1.0 * 2 * 1.5) < 1e-9
+
+
 def test_system_hits_once_and_projectile_dies():
     me = Player((0, 0))
     t = dummy([P.PSY], (150, 0))

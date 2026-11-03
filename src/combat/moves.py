@@ -44,7 +44,7 @@ class MoveSpec:
 
 # --- Capacités des starters -------------------------------------------------------
 VIVE_ATTAQUE = MoveSpec("Vive-Attaque", PType.NORMAL, P, 20, "melee", 0.30, "Attack", 34, 0.12)
-TRANCH_HERBE = MoveSpec("Tranch'Herbe", PType.PLANTE, S, 35, "burst", 0.90, "Swing", 70, 0.22)
+TRANCH_HERBE = MoveSpec("Tranch'Herbe", PType.PLANTE, P, 35, "burst", 0.90, "Swing", 70, 0.22)
 BALLE_OMBRE = MoveSpec("Ball'Ombre", PType.SPECTRE, S, 25, "projectile", 0.60, "Shoot", 12, 1.2,
                        speed=520)
 
