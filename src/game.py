@@ -134,7 +134,8 @@ class Game:
             pygame.draw.circle(self.screen, (255, 255, 255), a.pos, a.radius, 2)
         self.player.draw(self.screen)
         self.texts.draw(self.screen)
-        self.hud.draw(self.screen, self.player, self.clock.get_fps())
+        self.hud.draw(self.screen, self.player, self.clock.get_fps(),
+                      show_help=not (self.menu or self.game_over))
         if self.room:
             self.hud.draw_run(self.screen, self.player, self.room.room_number, len(self.room.enemies))
         if self.menu:

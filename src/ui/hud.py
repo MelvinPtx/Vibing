@@ -1,39 +1,52 @@
 import pygame
 
 from .. import settings as S
+from . import theme as T
 
 
 class DebugHUD:
-    """Affiche cooldown du dash, i-frames et FPS (utile pour tester le Dash)."""
+    """HUD : dash (cooldown / i-frames), PV, salle, objets, aide des touches."""
 
-    def __init__(self):
-        self.font = pygame.font.SysFont("monospace", 16)
+    def draw(self, surface, player, fps: float, show_help: bool = True) -> None:
+        # --- panneau Dash (haut gauche) ---
+        box = T.panel(surface, (14, 12, 250, 70), T.PANEL, radius=18)
+        ready = 1 - player.dash_cd_left / S.DASH_COOLDOWN
+        T.text(surface, "DASH", 13, T.INK_SOFT, True, topleft=(box.x + 16, box.y + 10))
+        label = "PRÊT" if ready >= 1 else f"{player.dash_cd_left:.1f}s"
+        T.text(surface, label, 13, T.VIOLET if ready >= 1 else T.INK_SOFT, True,
+               topright=(box.right - 16, box.y + 10))
+        T.thin_bar(surface, (box.x + 16, box.y + 28, box.w - 32, 10), ready,
+                   T.VIOLET if ready >= 1 else T.GOLD)
+        T.text(surface, "I-FRAMES", 13, T.INK_SOFT, True, topleft=(box.x + 16, box.y + 44))
+        T.thin_bar(surface, (box.x + 92, box.y + 49, box.w - 108, 8),
+                   player.iframes_left / S.DASH_IFRAMES, T.SCARLET)
 
-    def _bar(self, surface, x, y, w, h, ratio, color, label):
-        pygame.draw.rect(surface, (50, 50, 60), (x, y, w, h))
-        pygame.draw.rect(surface, color, (x, y, int(w * max(0, min(1, ratio))), h))
-        pygame.draw.rect(surface, S.WHITE, (x, y, w, h), 1)
-        surface.blit(self.font.render(label, True, S.WHITE), (x + w + 8, y - 1))
+        if not show_help:
+            return
+        # --- aide des touches (bas gauche) ---
+        lines = ["ZQSD / WASD / flèches : bouger", "Espace / Maj / clic droit : dash",
+                 "Clic gauche : Vive-Attaque", "E : Tranch'Herbe   R : Ball'Ombre",
+                 f"Échap : quitter   ·   {fps:.0f} FPS"]
+        h = 18 * len(lines) + 16
+        help_box = pygame.Rect(14, S.SCREEN_H - h - 10, 290, h)
+        T.panel(surface, help_box, T.INK, radius=16, shadow=False, alpha=170)
+        for i, t in enumerate(lines):
+            T.text(surface, t, 13, T.PANEL, topleft=(help_box.x + 14, help_box.y + 9 + i * 18))
 
     def draw_run(self, surface, player, room_number: int, enemies_left: int) -> None:
-        x, y, w = S.SCREEN_W - 290, 16, 200
-        self._bar(surface, x, y, w, 14, player.hp / player.max_hp, S.RED, f"{player.hp:.0f}")
-        txt = f"Salle {room_number} · " + (f"{enemies_left} ennemis" if enemies_left else "Choisis une porte !")
-        surface.blit(self.font.render(txt, True, S.WHITE), (x, y + 24))
+        # --- panneau PV (haut droite), façon cadre de PV Pokémon ---
+        box = T.panel(surface, (S.SCREEN_W - 314, 12, 300, 76), T.PANEL, radius=18)
+        T.pill(surface, "PV", 13, T.SCARLET, T.PANEL, pad=(10, 2), topleft=(box.x + 16, box.y + 12))
+        T.text(surface, f"{player.hp:.0f} / {player.max_hp:.0f}", 16, T.INK, True,
+               topright=(box.right - 16, box.y + 10))
+        T.hp_bar(surface, (box.x + 16, box.y + 36, box.w - 32, 14), player.hp / player.max_hp)
+        status = (f"{enemies_left} ennemi{'s' if enemies_left > 1 else ''}"
+                  if enemies_left else "Choisis une porte !")
+        T.text(surface, f"Salle {room_number}", 14, T.INK_SOFT, True, topleft=(box.x + 16, box.y + 54))
+        T.text(surface, status, 14, T.VIOLET if not enemies_left else T.INK, True,
+               topright=(box.right - 16, box.y + 54))
+
+        # --- objets possédés : pastilles sous le panneau ---
         for i, mod in enumerate(player.modifiers):
-            surface.blit(self.font.render(f"• {mod.name}", True, S.YELLOW), (x, y + 48 + i * 18))
-
-    def draw(self, surface, player, fps: float) -> None:
-        ready = 1 - player.dash_cd_left / S.DASH_COOLDOWN
-        self._bar(surface, 16, 16, 160, 14, ready, S.CYAN if ready >= 1 else GREY_ORANGE,
-                  "DASH PRÊT" if ready >= 1 else f"DASH {player.dash_cd_left:.2f}s")
-        self._bar(surface, 16, 38, 160, 14, player.iframes_left / S.DASH_IFRAMES, S.YELLOW,
-                  f"I-FRAMES {player.iframes_left:.2f}s")
-        lines = [f"FPS {fps:4.0f}", "ZQSD/WASD/flèches : bouger", "ESPACE/MAJ/clic droit : dash",
-                 "clic gauche : Vive-Attaque (Normal)", "E : Tranch'Herbe (Plante)",
-                 "R : Ball'Ombre (Spectre)", "ÉCHAP : quitter"]
-        for i, t in enumerate(lines):
-            surface.blit(self.font.render(t, True, S.GREY), (16, S.SCREEN_H - 20 * len(lines) - 4 + i * 20))
-
-
-GREY_ORANGE = (200, 130, 60)
+            T.pill(surface, mod.name, 13, T.KIND_COLORS[mod.kind.name], T.PANEL, pad=(12, 4),
+                   topright=(box.right, box.bottom + 10 + i * 30))

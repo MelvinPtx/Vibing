@@ -12,6 +12,7 @@ class Modifier:
     description = ""
     kind = RewardKind.OBJET
     instant = False   # True : consommé à la récupération, jamais stocké
+    badge_type = None # PType affiché en pastille sur la carte de récompense (optionnel)
 
     def on_pickup(self, player) -> None: ...
     def on_attack(self, attack, player) -> None: ...
@@ -23,6 +24,7 @@ class Charbon(Modifier):
     name = "Charbon"
     description = "Vive-Attaque devient de type Feu et brûle l'ennemi (6 dégâts/s pendant 3 s)."
     BURN_TIME, BURN_DPS = 3.0, 6.0
+    badge_type = PType.FEU
 
     def on_attack(self, attack, player) -> None:
         if attack.slot != "basic":
@@ -65,6 +67,10 @@ class CT(Modifier):
     kind = RewardKind.CAPSULE
     slot = ""
     element = PType.NORMAL
+
+    @property
+    def badge_type(self):
+        return self.element
 
     def on_attack(self, attack, player) -> None:
         if attack.slot == self.slot:

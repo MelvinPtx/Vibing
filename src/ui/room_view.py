@@ -2,39 +2,39 @@ import pygame
 
 from .. import settings as S
 from ..levels import RewardKind, RoomManager
+from . import theme as T
 
-ICON = {  # couleur + lettre : placeholders d'icônes (assets/ plus tard)
-    RewardKind.CAPSULE: ((80, 140, 255), "CT"),
-    RewardKind.OBJET: ((250, 200, 60), "OB"),
-    RewardKind.SOIN: ((90, 200, 110), "+"),
+ICON = {  # lettre affichée sur la porte (assets/ plus tard)
+    RewardKind.CAPSULE: "CT",
+    RewardKind.OBJET: "OB",
+    RewardKind.SOIN: "+",
 }
 
 
 class RoomView:
-    def __init__(self):
-        self.font = pygame.font.SysFont("monospace", 15, bold=True)
-        self.big = pygame.font.SysFont("monospace", 26, bold=True)
-
     def draw(self, surface, room: RoomManager) -> None:
         a = room.arena
         pygame.draw.rect(surface, S.FLOOR, a)
         pygame.draw.rect(surface, S.WALL, a, 6)
-        if room.exits_locked:  # grille fermée au milieu du mur du haut
+        if room.exits_locked:  # grilles fermées dans le mur du haut
             for cx in (a.centerx - 160, a.centerx + 160):
-                r = pygame.Rect(cx - S.DOOR_W // 2, a.top - 3, S.DOOR_W, 6)
-                pygame.draw.rect(surface, (150, 50, 50), r)
+                r = pygame.Rect(cx - S.DOOR_W // 2, a.top - 4, S.DOOR_W, 8)
+                pygame.draw.rect(surface, T.SCARLET_DARK, r, border_radius=4)
         for d in room.doors:
-            color, letter = ICON[d.reward]
-            pygame.draw.rect(surface, (15, 15, 20), d.rect.inflate(8, 8))
-            pygame.draw.rect(surface, color, d.rect, border_radius=8)
-            t = self.big.render(letter, True, (20, 20, 20))
-            surface.blit(t, t.get_rect(center=d.rect.center))
-            lab = self.font.render(d.reward.value, True, S.WHITE)
-            surface.blit(lab, lab.get_rect(midtop=(d.rect.centerx, d.rect.bottom + 28)))
+            accent = T.KIND_COLORS[d.reward.name]
+            T.panel(surface, d.rect.inflate(10, 10), T.PANEL, radius=16)
+            pygame.draw.rect(surface, accent, d.rect, border_radius=12)
+            T.text(surface, ICON[d.reward], 24, T.PANEL, True, center=d.rect.center)
+            T.pill(surface, d.reward.value, 14, T.PANEL, T.INK, pad=(12, 4),
+                   midtop=(d.rect.centerx, d.rect.bottom + 22))
 
-    def draw_overlay(self, surface, text, sub="") -> None:
-        t = self.big.render(text, True, S.WHITE)
-        surface.blit(t, t.get_rect(center=(S.SCREEN_W // 2, S.SCREEN_H // 2 - 20)))
+    def draw_overlay(self, surface, msg, sub="") -> None:
+        T.menu_backdrop(surface, S.SCREEN_W, S.SCREEN_H)
+        r = pygame.Rect(0, 0, 460, 150)
+        r.center = (S.SCREEN_W // 2, S.SCREEN_H // 2)
+        T.panel(surface, r, T.PANEL, radius=26)
+        band = pygame.Rect(r.x + 10, r.y + 10, r.w - 20, 62)
+        pygame.draw.rect(surface, T.SCARLET, band, border_radius=18)
+        T.text(surface, msg, 34, T.PANEL, True, center=band.center)
         if sub:
-            s = self.font.render(sub, True, S.GREY)
-            surface.blit(s, s.get_rect(center=(S.SCREEN_W // 2, S.SCREEN_H // 2 + 14)))
+            T.pill(surface, sub, 16, T.INK, T.PANEL, pad=(16, 6), center=(r.centerx, r.bottom - 40))

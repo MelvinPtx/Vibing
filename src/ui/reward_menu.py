@@ -1,14 +1,15 @@
 import pygame
 
 from .. import settings as S
-from .room_view import ICON
+from . import theme as T
 
-CARD_W, CARD_H, GAP = 250, 320, 30
+CARD_W, CARD_H, GAP = 258, 300, 28
+KIND_ICON = {"OBJET": "OB", "CAPSULE": "CT", "SOIN": "+"}
 
 
-def _wrap(font, text, width):
+def _wrap(font, msg, width):
     lines, line = [], ""
-    for word in text.split():
+    for word in msg.split():
         test = f"{line} {word}".strip()
         if font.size(test)[0] > width and line:
             lines.append(line)
@@ -26,11 +27,8 @@ class RewardMenu:
         self.index = 0
         total = len(choices) * CARD_W + (len(choices) - 1) * GAP
         x0 = (S.SCREEN_W - total) // 2
-        self.rects = [pygame.Rect(x0 + i * (CARD_W + GAP), 190, CARD_W, CARD_H)
+        self.rects = [pygame.Rect(x0 + i * (CARD_W + GAP), 225, CARD_W, CARD_H)
                       for i in range(len(choices))]
-        self.title = pygame.font.SysFont("monospace", 28, bold=True)
-        self.font = pygame.font.SysFont("monospace", 16)
-        self.bold = pygame.font.SysFont("monospace", 20, bold=True)
 
     def handle_event(self, e):
         n = len(self.choices)
@@ -55,25 +53,72 @@ class RewardMenu:
                     return self.choices[i]
         return None
 
+    # --- rendu ---------------------------------------------------------------
     def draw(self, surface) -> None:
-        dim = pygame.Surface((S.SCREEN_W, S.SCREEN_H), pygame.SRCALPHA)
-        dim.fill((0, 0, 0, 170))
-        surface.blit(dim, (0, 0))
-        t = self.title.render("Choisis ta récompense", True, S.WHITE)
-        surface.blit(t, t.get_rect(center=(S.SCREEN_W // 2, 130)))
+        T.menu_backdrop(surface, S.SCREEN_W, S.SCREEN_H)
+        self._draw_title(surface)
         for i, (mod, r) in enumerate(zip(self.choices, self.rects)):
-            color, _ = ICON[mod.kind]
-            selected = i == self.index
-            pygame.draw.rect(surface, (44, 48, 66), r, border_radius=12)
-            pygame.draw.rect(surface, color, (r.x, r.y, r.w, 70), border_top_left_radius=12,
-                             border_top_right_radius=12)
-            pygame.draw.rect(surface, S.WHITE if selected else S.GREY, r, 4 if selected else 2,
-                             border_radius=12)
-            for j, line in enumerate(_wrap(self.bold, mod.name, r.w - 24)):
-                surface.blit(self.bold.render(line, True, (20, 20, 20)), (r.x + 12, r.y + 12 + j * 24))
-            surface.blit(self.font.render(mod.kind.value, True, S.GREY), (r.x + 12, r.y + 84))
-            for j, line in enumerate(_wrap(self.font, mod.description, r.w - 24)):
-                surface.blit(self.font.render(line, True, S.WHITE), (r.x + 12, r.y + 120 + j * 22))
-            surface.blit(self.font.render(f"[{i + 1}]", True, S.YELLOW), (r.right - 40, r.bottom - 28))
-        h = self.font.render("← → / souris pour choisir · ENTRÉE ou 1-3 / clic pour valider", True, S.GREY)
-        surface.blit(h, h.get_rect(center=(S.SCREEN_W // 2, 560)))
+            self._draw_card(surface, mod, r, i, selected=(i == self.index))
+        self._draw_hints(surface)
+
+    def _draw_title(self, surface) -> None:
+        r = pygame.Rect(0, 0, 440, 62)
+        r.center = (S.SCREEN_W // 2, 128)
+        T.panel(surface, r, T.PANEL, radius=31)
+        tab = pygame.Rect(r.x + 8, r.y + 8, 46, r.h - 16)   # pastille écarlate à gauche
+        pygame.draw.rect(surface, T.SCARLET, tab, border_radius=(r.h - 16) // 2)
+        T.text(surface, "!", 28, T.PANEL, True, center=tab.center)
+        T.text(surface, "Choisis ta récompense", 26, T.INK, True,
+               center=(r.centerx + 26, r.centery))
+
+    def _draw_card(self, surface, mod, rect, i, selected) -> None:
+        kind = mod.kind.name
+        accent = T.KIND_COLORS[kind]
+        r = rect.move(0, -14 if selected else 0)          # la carte sélectionnée se soulève
+        T.panel(surface, r, T.PANEL, radius=22,
+                border=T.SCARLET if selected else T.PANEL_DIM, border_w=5 if selected else 3)
+
+        # bandeau coloré avec rayures + pastille d'icône
+        head = pygame.Rect(r.x + 8, r.y + 8, r.w - 16, 92)
+        pygame.draw.rect(surface, accent, head, border_radius=16)
+        clip = surface.get_clip()
+        surface.set_clip(head)
+        T.stripes(surface, head, (255, 255, 255), 28, 22, 7)
+        surface.set_clip(clip)
+        icon = pygame.Rect(0, 0, 60, 60)
+        icon.midleft = (head.x + 16, head.centery)
+        pygame.draw.circle(surface, T.PANEL, icon.center, 30)
+        pygame.draw.circle(surface, T.INK, icon.center, 30, 3)
+        T.text(surface, KIND_ICON[kind], 22, accent, True, center=icon.center)
+        name_w = head.w - icon.w - 44
+        size = 20 if all(T.font(20, True).size(w)[0] <= name_w for w in mod.name.split()) else 17
+        for j, line in enumerate(_wrap(T.font(size, True), mod.name, name_w)):
+            T.text(surface, line, size, T.PANEL, True,
+                   topleft=(icon.right + 12, head.y + 22 + j * (size + 4)))
+
+        # catégorie + pastille de type
+        cat = T.pill(surface, mod.kind.value, 13, T.PANEL_DIM, T.INK_SOFT, pad=(10, 4),
+                     topleft=(r.x + 16, head.bottom + 14))
+        if mod.badge_type is not None:
+            T.type_badge(surface, mod.badge_type, topleft=(cat.right + 8, cat.y))
+
+        # description
+        for j, line in enumerate(_wrap(T.font(16), mod.description, r.w - 36)):
+            T.text(surface, line, 16, T.INK, topleft=(r.x + 18, cat.bottom + 14 + j * 22))
+
+        # touche de raccourci
+        T.pill(surface, str(i + 1), 15, T.SCARLET if selected else T.INK_SOFT, T.PANEL,
+               pad=(11, 3), bottomright=(r.right - 14, r.bottom - 14))
+        if selected:  # curseur
+            pygame.draw.polygon(surface, T.SCARLET,
+                                [(r.centerx - 12, r.bottom + 12), (r.centerx + 12, r.bottom + 12),
+                                 (r.centerx, r.bottom + 28)])
+
+    def _draw_hints(self, surface) -> None:
+        bar = pygame.Rect(0, 0, 640, 46)
+        bar.center = (S.SCREEN_W // 2, 600)
+        T.panel(surface, bar, T.INK, radius=23, shadow=False, alpha=235)
+        x = bar.x + 22
+        x = T.key_hint(surface, "← →", "Choisir", x, bar.centery)
+        x = T.key_hint(surface, "Entrée", "Valider", x, bar.centery)
+        T.key_hint(surface, "1-3", "Sélection directe", x, bar.centery)
