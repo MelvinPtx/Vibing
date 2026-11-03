@@ -1,3 +1,3 @@
-from .hud import DebugHUD
+from .hud import HUD
 
-__all__ = ["DebugHUD"]
+__all__ = ["HUD"]

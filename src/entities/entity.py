@@ -15,6 +15,8 @@ class Stats:
 class Entity:
     """Base de toute entité : position, hitbox cercle, types, stats, PV."""
 
+    name = ""
+
     def __init__(self, pos, radius: float, color, types=(), max_hp: float = 100):
         self.pos = Vector2(pos)
         self.radius = radius

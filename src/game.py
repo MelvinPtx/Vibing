@@ -7,8 +7,9 @@ from .combat.types import PType
 from .entities import Intent, Player, PlayerController, TrainingDummy
 from .items import apply_reward, roll_choices
 from .levels import RoomManager
-from .ui import DebugHUD
+from .ui import HUD
 from .ui.floating_text import FloatingTexts
+from .ui.pause_menu import PauseMenu
 from .ui.reward_menu import RewardMenu
 from .ui.room_view import RoomView
 
@@ -33,7 +34,7 @@ class Game:
         self.arena = pygame.Rect(S.ARENA_MARGIN, S.ARENA_MARGIN,
                                  S.SCREEN_W - 2 * S.ARENA_MARGIN, S.SCREEN_H - 2 * S.ARENA_MARGIN)
         self.training = training
-        self.hud = DebugHUD()
+        self.hud = HUD()
         self.view = RoomView()
         self.texts = FloatingTexts()
         self.running = True
@@ -45,6 +46,7 @@ class Game:
         self.controller = PlayerController(self.player, self.arena)
         self.combat = CombatSystem()
         self.menu = None
+        self.pause = None
         self.texts.items.clear()
         if self.training:
             self.room = None
@@ -67,27 +69,47 @@ class Game:
         return Intent(move=move, dash=dash_event, attack=attack,
                       aim=Vector2(pygame.mouse.get_pos()))
 
+    def handle_event(self, e) -> str | None:
+        """Traite un événement pygame. Renvoie "dash" / "basic" / "special" / "cast" ou None."""
+        if e.type == pygame.QUIT:
+            self.running = False
+        elif self.menu:                                   # menu de récompense : capte tout
+            chosen = self.menu.handle_event(e)
+            if chosen:
+                self.pick_reward(chosen)
+        elif self.pause:                                  # menu pause : capte tout
+            res = self.pause.handle_event(e)
+            if res == "resume":
+                self.pause = None
+            elif res == "quit":
+                self.running = False
+        elif e.type == pygame.KEYDOWN and e.key == pygame.K_ESCAPE:
+            if self.game_over:
+                self.running = False
+            else:
+                self.pause = PauseMenu()
+        elif e.type == pygame.KEYDOWN and e.key == pygame.K_RETURN and self.game_over:
+            self.reset()
+        elif e.type == pygame.KEYDOWN and e.key in DASH_KEYS:
+            return "dash"
+        elif e.type == pygame.KEYDOWN and e.key in ATTACK_KEYS:
+            return ATTACK_KEYS[e.key]
+        elif e.type == pygame.MOUSEBUTTONDOWN and e.button == 3:
+            return "dash"
+        elif e.type == pygame.MOUSEBUTTONDOWN and e.button == 1:
+            return "basic"
+        return None
+
     def run(self) -> None:
         while self.running:
             dt = self.clock.tick(S.FPS) / 1000.0
             dash_event, attack = False, None
             for e in pygame.event.get():
-                if e.type == pygame.QUIT or (e.type == pygame.KEYDOWN and e.key == pygame.K_ESCAPE):
-                    self.running = False
-                elif self.menu:
-                    chosen = self.menu.handle_event(e)
-                    if chosen:
-                        self.pick_reward(chosen)
-                elif e.type == pygame.KEYDOWN and e.key == pygame.K_RETURN and self.game_over:
-                    self.reset()
-                elif e.type == pygame.KEYDOWN and e.key in DASH_KEYS:
+                action = self.handle_event(e)
+                if action == "dash":
                     dash_event = True
-                elif e.type == pygame.KEYDOWN and e.key in ATTACK_KEYS:
-                    attack = ATTACK_KEYS[e.key]
-                elif e.type == pygame.MOUSEBUTTONDOWN and e.button == 3:
-                    dash_event = True
-                elif e.type == pygame.MOUSEBUTTONDOWN and e.button == 1:
-                    attack = "basic"
+                elif action:
+                    attack = action
             self.update(self.read_intent(dash_event, attack), min(dt, 0.05))
             self.draw()
         pygame.quit()
@@ -98,7 +120,7 @@ class Game:
         self.menu = None
 
     def update(self, intent: Intent, dt: float) -> None:
-        if self.game_over or self.menu:
+        if self.game_over or self.menu or self.pause:
             return
         for atk in self.controller.update(intent, dt):
             self.combat.spawn(atk)
@@ -128,18 +150,22 @@ class Game:
         else:
             pygame.draw.rect(self.screen, S.FLOOR, self.arena)
             pygame.draw.rect(self.screen, S.WALL, self.arena, 6)
-        for e in (self.room.enemies if self.room else self.dummies):
+        entities = self.room.enemies if self.room else self.dummies
+        for e in entities:
             e.draw(self.screen)
         for a in self.combat.attacks:
             pygame.draw.circle(self.screen, (255, 255, 255), a.pos, a.radius, 2)
         self.player.draw(self.screen)
+        self.hud.draw_world(self.screen, entities, show_types=self.training)
         self.texts.draw(self.screen)
-        self.hud.draw(self.screen, self.player, self.clock.get_fps(),
-                      show_help=not (self.menu or self.game_over))
-        if self.room:
-            self.hud.draw_run(self.screen, self.player, self.room.room_number, len(self.room.enemies))
+        room_number = self.room.room_number if self.room else 0
         if self.menu:
             self.menu.draw(self.screen)
-        if self.game_over:
-            self.view.draw_overlay(self.screen, "K.O. !", "ENTRÉE : recommencer")
+        elif self.pause:
+            self.pause.draw(self.screen, self.player, room_number)
+        elif self.game_over:
+            self.view.draw_game_over(self.screen, self.player, room_number)
+        else:
+            self.hud.draw(self.screen, self.player, self.clock.get_fps(), room_number,
+                          len(self.room.enemies) if self.room else 0)
         pygame.display.flip()

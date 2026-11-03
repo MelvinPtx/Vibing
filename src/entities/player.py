@@ -27,6 +27,7 @@ class Player(Entity):
     def __init__(self, pos):
         super().__init__(pos, S.PLAYER_RADIUS, S.YELLOW, types=(PType.NORMAL,),
                          max_hp=S.PLAYER_MAX_HP)
+        self.name = S.PLAYER_NAME
         self.atk_cd = {k: 0.0 for k in COOLDOWNS}
         self.modifiers: list = []   # Modifier actifs (src/items)
         self.facing = Vector2(1, 0)

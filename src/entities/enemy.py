@@ -93,14 +93,11 @@ class Enemy(Entity):
             return
         pygame.draw.circle(surface, S.WHITE if self.flash > 0 else self.color, self.pos, self.radius)
         pygame.draw.circle(surface, (20, 20, 20), self.pos, self.radius, 2)
-        self.draw_status(surface)
-        w = 34
-        x, y = self.pos.x - w / 2, self.pos.y - self.radius - 10
-        pygame.draw.rect(surface, (60, 20, 20), (x, y, w, 5))
-        pygame.draw.rect(surface, S.RED, (x, y, w * self.hp / self.max_hp, 5))
+        self.draw_status(surface)   # barre de PV et nom : dessinés par le HUD
 
 
 class Rattata(Enemy):
+    name = "Rattata"
     speed = 150.0
 
     def __init__(self, pos):

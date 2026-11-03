@@ -1,52 +1,60 @@
+"""HUD en jeu : cadre du Pokémon (nom, « Lv. », jauge de PV chiffrée) façon écran de combat,
+coins dorés, indications de touches, étiquettes de PV au-dessus des ennemis."""
 import pygame
 
 from .. import settings as S
 from . import theme as T
 
 
-class DebugHUD:
-    """HUD : dash (cooldown / i-frames), PV, salle, objets, aide des touches."""
+class HUD:
+    # --- éléments dans le monde (barres au-dessus des ennemis) ---------------------
+    def draw_world(self, surface, entities, show_types: bool = False) -> None:
+        for e in entities:
+            if not e.alive or getattr(e, "spawning", False):
+                continue
+            bar = pygame.Rect(0, 0, 64, 12)
+            bar.midbottom = (e.pos.x, e.pos.y - e.radius - 8)
+            T.hp_bar(surface, bar, e.hp / e.max_hp)
+            T.text(surface, e.name, 14, T.WHITE, shadow=True, midbottom=(bar.centerx, bar.top - 2))
+            if show_types and e.types:
+                T.type_pills(surface, e.types, int(e.pos.x), int(e.pos.y + e.radius + 8), 18)
 
-    def draw(self, surface, player, fps: float, show_help: bool = True) -> None:
-        # --- panneau Dash (haut gauche) ---
-        box = T.panel(surface, (14, 12, 250, 70), T.PANEL, radius=18)
-        ready = 1 - player.dash_cd_left / S.DASH_COOLDOWN
-        T.text(surface, "DASH", 13, T.INK_SOFT, True, topleft=(box.x + 16, box.y + 10))
-        label = "PRÊT" if ready >= 1 else f"{player.dash_cd_left:.1f}s"
-        T.text(surface, label, 13, T.VIOLET if ready >= 1 else T.INK_SOFT, True,
-               topright=(box.right - 16, box.y + 10))
-        T.thin_bar(surface, (box.x + 16, box.y + 28, box.w - 32, 10), ready,
-                   T.VIOLET if ready >= 1 else T.GOLD)
-        T.text(surface, "I-FRAMES", 13, T.INK_SOFT, True, topleft=(box.x + 16, box.y + 44))
-        T.thin_bar(surface, (box.x + 92, box.y + 49, box.w - 108, 8),
-                   player.iframes_left / S.DASH_IFRAMES, T.SCARLET)
+    # --- HUD ---------------------------------------------------------------------
+    def draw(self, surface, player, fps: float, room_number: int = 0, enemies_left: int = 0) -> None:
+        T.corner_brackets(surface)
+        T.text(surface, f"{fps:.0f} FPS", 12, T.GREY, False, topleft=(80, 16))
+        self._player_panel(surface, player, room_number)
+        if room_number:
+            self._room_panel(surface, player, room_number, enemies_left)
+        T.prompt_bar(surface, [("Clic G", "Attaque"), ("E", "Tranch'Herbe"), ("R", "Ball'Ombre"),
+                               ("Espace", "Dash"), ("Échap", "Menu")],
+                     S.SCREEN_W - 28, S.SCREEN_H - 24)
 
-        if not show_help:
-            return
-        # --- aide des touches (bas gauche) ---
-        lines = ["ZQSD / WASD / flèches : bouger", "Espace / Maj / clic droit : dash",
-                 "Clic gauche : Vive-Attaque", "E : Tranch'Herbe   R : Ball'Ombre",
-                 f"Échap : quitter   ·   {fps:.0f} FPS"]
-        h = 18 * len(lines) + 16
-        help_box = pygame.Rect(14, S.SCREEN_H - h - 10, 290, h)
-        T.panel(surface, help_box, T.INK, radius=16, shadow=False, alpha=170)
-        for i, t in enumerate(lines):
-            T.text(surface, t, 13, T.PANEL, topleft=(help_box.x + 14, help_box.y + 9 + i * 18))
+    def _player_panel(self, surface, p, room_number) -> None:
+        r = pygame.Rect(24, S.SCREEN_H - 158, 308, 140)
+        T.alpha_rect(surface, r, T.NAVY, 185, 14)
+        T.lv_pill(surface, f"Salle {room_number}" if room_number else "Entraînement",
+                  topleft=(r.x + 16, r.y + 12))
+        T.text(surface, p.name, 24, T.WHITE, shadow=True, topleft=(r.x + 16, r.y + 38))
+        T.hp_bar(surface, (r.x + 14, r.y + 70, r.w - 28, 26), p.hp / p.max_hp,
+                 f"{p.hp:.0f}/{p.max_hp:.0f}")
+        ready = 1 - p.dash_cd_left / S.DASH_COOLDOWN
+        T.text(surface, "DASH", 12, T.LABEL, topleft=(r.x + 16, r.y + 104))
+        T.thin_bar(surface, (r.x + 70, r.y + 107, r.w - 86, 8), ready, T.LIME if ready >= 1 else T.AMBER)
+        T.text(surface, "I-FRAMES", 12, T.LABEL, topleft=(r.x + 16, r.y + 120))
+        T.thin_bar(surface, (r.x + 94, r.y + 123, r.w - 110, 8),
+                   p.iframes_left / S.DASH_IFRAMES, T.CYAN)
 
-    def draw_run(self, surface, player, room_number: int, enemies_left: int) -> None:
-        # --- panneau PV (haut droite), façon cadre de PV Pokémon ---
-        box = T.panel(surface, (S.SCREEN_W - 314, 12, 300, 76), T.PANEL, radius=18)
-        T.pill(surface, "PV", 13, T.SCARLET, T.PANEL, pad=(10, 2), topleft=(box.x + 16, box.y + 12))
-        T.text(surface, f"{player.hp:.0f} / {player.max_hp:.0f}", 16, T.INK, True,
-               topright=(box.right - 16, box.y + 10))
-        T.hp_bar(surface, (box.x + 16, box.y + 36, box.w - 32, 14), player.hp / player.max_hp)
+    def _room_panel(self, surface, p, room_number, enemies_left) -> None:
+        r = pygame.Rect(S.SCREEN_W - 300, 20, 276, 46)
+        T.alpha_rect(surface, r, T.NAVY, 185, 14)
+        T.lv_pill(surface, f"Salle {room_number}", topleft=(r.x + 12, r.y + 10))
         status = (f"{enemies_left} ennemi{'s' if enemies_left > 1 else ''}"
                   if enemies_left else "Choisis une porte !")
-        T.text(surface, f"Salle {room_number}", 14, T.INK_SOFT, True, topleft=(box.x + 16, box.y + 54))
-        T.text(surface, status, 14, T.VIOLET if not enemies_left else T.INK, True,
-               topright=(box.right - 16, box.y + 54))
-
-        # --- objets possédés : pastilles sous le panneau ---
-        for i, mod in enumerate(player.modifiers):
-            T.pill(surface, mod.name, 13, T.KIND_COLORS[mod.kind.name], T.PANEL, pad=(12, 4),
-                   topright=(box.right, box.bottom + 10 + i * 30))
+        T.text(surface, status, 17, T.WHITE if enemies_left else T.YELLOW, midright=(r.right - 14, r.centery))
+        for i, mod in enumerate(p.modifiers):   # objets possédés : lignes façon menu
+            rr = pygame.Rect(r.x, r.bottom + 8 + i * 42, r.w, 36)
+            T.alpha_rect(surface, rr, T.NAVY, 170, 9)
+            sq = pygame.Rect(rr.x + 6, rr.y + 5, 26, 26)
+            pygame.draw.rect(surface, T.KIND_COLORS[mod.kind.name], sq, border_radius=7)
+            T.text(surface, mod.name, 16, T.WHITE, midleft=(sq.right + 10, rr.centery))

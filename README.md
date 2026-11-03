@@ -9,8 +9,9 @@ python -m tests.test_dash      # tests headless du déplacement / dash
 python -m tests.test_combat    # tests headless table des types / dégâts
 python -m tests.test_rooms     # tests headless ennemis / salles / portes
 python -m tests.test_items     # tests headless modificateurs / récompenses
+python -m tests.test_ui        # tests headless menus (navigation, pause, rendu)
 ```
-Contrôles : ZQSD / WASD / flèches = bouger · Espace / Maj / clic droit = Dash · Échap = quitter.
+Contrôles : ZQSD / WASD / flèches = bouger · Espace / Maj / clic droit = Dash · clic gauche / E / R = attaques · Échap = menu pause (Reprendre / Statut / Quitter).
 
 ## Architecture
 - `src/settings.py` : constantes (vitesse, durée du dash, i-frames, cooldown…).
@@ -19,4 +20,4 @@ Contrôles : ZQSD / WASD / flèches = bouger · Espace / Maj / clic droit = Dash
 - `src/combat/` : (phase 2) types, attaques, dégâts.
 - `src/levels/` : (phase 3) salles, RoomManager.
 - `src/items/` : modificateurs passifs (`on_attack` / `on_update` / `on_pickup`) et catalogue de récompenses.
-- `src/ui/` : HUD, vue de salle, menu de récompense.
+- `src/ui/` : interface au style Pokémon Écarlate/Violet : `theme.py` (palette, bandeaux, curseur, jauges, pastilles de type), `hud.py`, `reward_menu.py`, `pause_menu.py` (menu + statut), `room_view.py`.

@@ -36,3 +36,6 @@ HIT_IFRAMES = 0.6
 DOOR_W, DOOR_H = 90, 44
 SPAWN_DELAY = 0.8           # s : télégraphie d'apparition (ennemi inoffensif et intouchable)
 MIN_SPAWN_DIST = 260        # px minimum entre un spawn et le joueur
+
+# Identité du joueur (affichée dans le HUD et les menus)
+PLAYER_NAME = "Évoli"
